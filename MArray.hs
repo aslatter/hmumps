@@ -15,7 +15,7 @@ data MArray = ValueCell MValue (Map MValue MArray)
 -- return the value associated with those subs.
 mIndex :: MArray -> [MValue] -> Maybe MValue
 mIndex (Empty _) []         = Nothing
-mIndex (ValueCell v _) []   = Maybe v
+mIndex (ValueCell v _) []   = Just v
 mIndex (Empty map) (x:xs)   = do vc <- lookup x map
                                  mIndex vc xs
 mIndex (ValueCell v map) (x:xs) = do vc <- lookup x map

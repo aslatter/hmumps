@@ -11,7 +11,9 @@ import Char
 data MValue = String String
             | Number Integer
             | Float  Float
- deriving Show
+ deriving (Show, Ord, Eq) -- These derivations are BAD
+                          -- but I need something for
+                          -- the MArrays to work.
 
 
 -- Cast to String
