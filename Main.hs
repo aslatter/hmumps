@@ -1,5 +1,8 @@
 module Main where
 
+-- Copyright 2007 Antoine Latter
+-- aslatter@gmail.com
+
 import qualified Data.Map as Map
 import Text.ParserCombinators.Parsec
 
@@ -18,6 +21,10 @@ import MValue
 --
 -- It's intended that the execution environment will execute these
 -- structures - so that it's a step removed from parsing.
+
+
+-- NOTES: I expect I'll be scraping everything between this
+--  and "Data Vn ..."
 
 
 data CommandLabel = Break | Close | Do | Else | For | Goto | Halt | Hang
