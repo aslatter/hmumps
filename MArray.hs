@@ -5,8 +5,9 @@ module MArray where
 
 import Data.Map
 import MValue
+import Prelude hiding (lookup)
 
-Data MArray = ValueCell MValue (Map MValue MArray)
+data MArray = ValueCell MValue (Map MValue MArray)
             | Empty (Map MValue MArray)
 
 
