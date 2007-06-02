@@ -3,7 +3,6 @@ module Main where
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com
 
-import qualified Data.Map as Map
 import Text.ParserCombinators.Parsec
 
 import MValue
@@ -27,16 +26,28 @@ import MValue
 --  and "Data Vn ..."
 
 
+-- these commandlabels are going, and are only here for reference (as
+-- it is a complete list).
 data CommandLabel = Break | Close | Do | Else | For | Goto | Halt | Hang
                   | If | Job | Kill | Lock | Merge | New | Open | Quit
                   | Read | Set | TCommit | TRestart | TRollback | TStart 
                   | Use | View | Write | Xecute | ZUnspecified String
   deriving (Eq, Show)
 
-type CommandLine = [(CommandLabel,(Maybe Condition),[CommandArg])]
-data CommandArg = IndirectArg String | SimpleArg ArgLabel [Expression] | ComplexArg ArgLabel [CommandArg]
+-- I feel like this is going to turn into an explosion of type contructors
+data Command = Break (Maybe Condition)
+             | Do (Maybe Condition) Location
+             | Else
+             | Goto (Maybe Condition) Location
+             | Halt (Maybe Condition)
+             | Hang (Maybe Condition) Expression
+             | If [Condition]
+             | Kill (Maybe Condition) [KillArg]
+             | New (Maybe Condition) [NewArg]
+             | Set (Maybe Condition) [SetArg]
 
-data ArgLabel = Exclussive | SetLabel | NoLabel
+
+
 
 type Condition = Expression
 
@@ -45,5 +56,6 @@ data Vn = Lvn String [Expression]
         | Gvn String [Expression]
         | IndirectVn String [Expression]
 
+-- there's somehting I'm not groking wrt the standard and expressions
 type Expression = [ExprAtom]
 data ExprAtom = ExprVn Vn 

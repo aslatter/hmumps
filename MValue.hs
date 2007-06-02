@@ -16,22 +16,22 @@ data MValue = String String
                       -- MArray to work.
 
 instance MValue Eq where
- (v1 == v2) = (meq (mNormal v1) (mNormal v2))
-  where
-   meq :: MValue -> MValue -> Bool
-   -- Easy cases
-   meq (String s1) (String s2) = s1 == s2
-   meq (Number n1) (Number n2) = n1 == n2
-   meq (Float f1)  (Float f2)  = f1 == f2
-   -- Simple numeric cases
-   meq (Number n)  (Float f) = f == (fromInteger n)
-   meq (Float f)   (Number n) = f == (fromInteger n)
-   -- All that's left is false
-   meq (String _) (Float  _) = False
-   meq (String _) (Number _) = False
-   meq (Float  _) (String _) = False
-   meq (Number _) (String _) = False
-   -- The above should catch everything
+    (v1 == v2) = (meq (mNormal v1) (mNormal v2))
+        where
+          meq :: MValue -> MValue -> Bool
+          -- Easy cases
+          meq (String s1) (String s2) = s1 == s2
+          meq (Number n1) (Number n2) = n1 == n2
+          meq (Float f1)  (Float f2)  = f1 == f2
+          -- Simple numeric cases
+          meq (Number n)  (Float f) = f == (fromInteger n)
+          meq (Float f)   (Number n) = f == (fromInteger n)
+          -- All that's left is false
+          meq (String _) (Float  _) = False
+          meq (String _) (Number _) = False
+          meq (Float  _) (String _) = False
+          meq (Number _) (String _) = False
+          -- The above should catch everything
 
 -- Cast to String
 mString :: MValue -> MValue
@@ -44,11 +44,11 @@ mString x@(String _) = x
 mNum :: MValue -> MValue
 mNum (String [])  = Number 0
 mNum (String s) = if isSpace (head s) then Number 0 else
-    case (reads s :: [(Integer,String)]) of
-      (i,s):[] -> Number i
-      _        -> case (reads s :: [(Float,String)]) of
-                    (f,s):[] -> Float f
-                    _        -> Number 0
+  case (reads s :: [(Integer,String)]) of
+    (i,s):[] -> Number i
+    _        -> case (reads s :: [(Float,String)]) of
+                  (f,s):[] -> Float f
+                  _        -> Number 0
 mNum x@(_) = x
 
 
