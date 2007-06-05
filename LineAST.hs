@@ -1,4 +1,4 @@
-module Main where
+module LineAST where
 
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com
