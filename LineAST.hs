@@ -23,22 +23,14 @@ import MValue
 -- concept of "line"
 
 
--- these commandlabels are going, and are only here for reference (as
--- it is a complete list).
-data CommandLabel = Break | Close | Do | Else | For | Goto | Halt | Hang
-                  | If | Job | Kill | Lock | Merge | New | Open | Quit
-                  | Read | Set | TCommit | TRestart | TRollback | TStart 
-                  | Use | View | Write | Xecute | ZUnspecified String
-  deriving (Eq, Show)
-
 -- I feel like this is going to turn into an explosion of type contructors
+--
 -- These commands make up the initial sub-set of commands I'd like
 -- to implement.  I'm not sure if the ASTs described here will make
 -- up the optimizable representation, but they will make up what's
 -- executed by my first stab at a run-time environment.
 data Command = Break (Maybe Condition)
              | Do (Maybe Condition) [(Maybe Condition,Location,[FunArg])]
-             | DoAnon (Maybe Condition) [Command]
              | Else
              | For (Maybe (Vn, ForArg)) -- note lack of postcondition
              | Goto (Maybe Condition) [(Maybe Condition,Location)]
@@ -109,12 +101,75 @@ type Name = Name String | LName Expression
 data Expression = ExpLit MValue 
                 | ExpVn Vn
                 | ExpUnary UnaryOp Expression
-                | ExpBinary BinOp Expression Expression
-                | ExpBIFCall String [Expression]
-                | ExpFuncal  String (Maybe String) [Expression]
-                | ExpPat Expression Pattern
+                | BinaryOp BinOp Expression Expression
+                | BIFCall String [Expression]
+                | Funcal  String (Maybe String) [Expression]
+                | Pattern Expression Pattern
 
 type Pattern = () -- I'm hoping that MUMPS patterns can be mapped
                   -- directly onto regexs.  I can't find any useful
                   -- documentation on regexs in Haskell.  Even if
                   --  I could, I don't know regexs anyway.
+
+data UnaryOp = Not | UPlus | UMinus
+data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
+
+
+
+parseCommands :: Parser [Command]
+parseCommands = do x <- command
+                   many1 spaces -- what about comments?
+                   xs <- (parseCommands <|> return [])
+                   return (x:xs)
+
+command :: Parser Command
+command = parseBreak
+      <|> parseDo
+      <|> parseElse
+      <|> parseFor
+      <|> parseGoto
+      <|> parseHa  -- left factored halt or hang
+      <|> parseIf
+      <|> parseKill
+      <|> parseMerge
+      <|> parseNew
+      <|> parseSet
+
+parseBreak :: Parser Command
+parseBreak = do stringOrPrefix "break"
+                cond <- postCondition
+                return $ Break cond
+
+postCondition :: Parser (Maybe Expression)
+postCondition = do char ':'
+                   cond <- parseExp
+                   return $ Just cond
+      <|> return Nothing
+
+parseDo :: Parser Command  -- doesn't work at end of line.  Make the space and args optional?
+parseDo = do stringOrPrefix "do"
+             cond <- postCondition
+             char ' '
+             args <- mlist (do loc <- parseLocation
+                               args <- arglist parseFunArg
+                               cond <- postCondition
+                               return (cond,loc,args))
+             return $ Do cond args
+
+-- Given a parser, parse a comma separated list of these.
+mlist :: Parser a -> Parser [a]
+mlist pa = mlist1 <|> return []
+
+-- Similar to mlist, but must grab at least one
+mlist1 :: Parser a -> Parser [a]
+mlist1 pa = do x <- pa
+              xs <- (do char ','
+                        mlist ps) <|> return []
+              return (x:xs)
+
+-- Given a parser, parse a comma separated list of these surrounded by parens
+arglist :: Parser a -> Parser [a]
+arglist pa = do char '('
+                xs <- mlist pa
+                char ')'
+         <|> return []
