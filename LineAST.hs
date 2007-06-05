@@ -32,9 +32,15 @@ data CommandLabel = Break | Close | Do | Else | For | Goto | Halt | Hang
   deriving (Eq, Show)
 
 -- I feel like this is going to turn into an explosion of type contructors
+-- These commands make up the initial sub-set of commands I'd like
+-- to implement.  I'm not sure if the ASTs described here will make
+-- up the optimizable representation, but they will make up what's
+-- executed by my first stab at a run-time environment.
 data Command = Break (Maybe Condition)
              | Do (Maybe Condition) [(Maybe Condition,Location,[FunArg])]
+             | DoAnon (Maybe Condition) [Command]
              | Else
+             | For (Maybe (Vn, ForArg)) -- note lack of postcondition
              | Goto (Maybe Condition) [(Maybe Condition,Location)]
              | Halt (Maybe Condition)
              | Hang (Maybe Condition) Expression
@@ -50,27 +56,65 @@ data Location = Routine Routineref
               | Subroutine DLabel (Maybe Integer) Routineref
 
 data DLabel = DLabel String 
-            | DLabelIndirect String
+            | DLabelIndirect Expression
 
 data Routineref = Routineref (Maybe String) String
-                | RoutinerefIndirect String
+                | RoutinerefIndirect Expression
 
 
 type Condition = Expression
+type Subscript = Expression
 
+-- See 8.2.5
+data ForArg = For1 Expression
+            | For2 Expression Expression
+            | For3 Expression Expression Expression
+
+-- See 8.2.11
+data KillArg = KillSelective Vn
+             | KillExclusive [Name]
+             | KillIndirect  Expression
+
+-- See 8.2.13
+type MergeArg = (Vn,Vn)
+
+
+-- See 8.2.14
+-- New should probably be broken up into more primative commands
+-- such as PushNewframe and AddNewframeEntry or something,
+-- for optimization.  I'll new to have designed the run-time
+-- environment first.
+data NewArg = NewSelective Name
+            | NewExclusive [Name]
+            | NewIndirect  Expression
 
 -- Variable names: 7.1.2
-data Vn = Lvn String [Expression]
-        | Gvn String [Expression]
-        | IndirectVn String [Expression]
+data Vn = Lvn Name [Subscript] -- these two will only ever
+        | Gvn Name [Subscript] -- be direct names.  Maybe.
+        | IndirectVn Expression [Subscript]
 
 
 data FunArg = FunArgExp Expression
             | FunArgName Name
 
-data Name = Name String | NameIndirect String
+-- Titles of routines, tags and variables.
+-- Name is what appears in the symbol table or
+-- whatever, LName is an expression which must
+-- evaluate to a Name.
+type Name = Name String | LName Expression
+
 
 -- there's somehting I'm not groking wrt the standard and expressions.
--- The "Exression' type will ikely be the last thing I define.
-type Expression = [ExprAtom]
-data ExprAtom = ExprVn Vn 
+-- The "Expression" type will ikely be the last thing I define.
+data Expression = ExpLit MValue 
+                | ExpVn Vn
+                | ExpUnary UnaryOp Expression
+                | ExpBinary BinOp Expression Expression
+                | ExpBIFCall String [Expression]
+                | ExpFuncal  String (Maybe String) [Expression]
+                | ExpPat Expression Pattern
+
+type Pattern = () -- I'm hoping that MUMPS patterns can be mapped
+                  -- directly onto regexs.  I can't find any useful
+                  -- documentation on regexs in Haskell.  Even if
+                  --  I could, I don't know regexs anyway.
