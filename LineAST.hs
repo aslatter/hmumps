@@ -165,7 +165,15 @@ parseKill = undefined
 parseMerge = undefined
 parseNew = undefined
 parseSet = undefined
-stringOrPrefix = undefined
+
+stringOrPrefix :: String -> Parser String
+stringOrPrefix (x:[]) = char x
+stringOrPrefix (x:xs) = do y <- char x
+                           ys <- stringOrPrefix xs
+                                 <|> return []
+                           return (y:ys)
+
+
 parseExp=undefined
 parseLocation=undefined
 parseFunArg=undefined
