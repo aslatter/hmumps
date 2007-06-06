@@ -15,8 +15,8 @@ data MValue = String String
                       -- but I need something for
                       -- MArray to work.
 
-instance MValue Eq where
-    (v1 == v2) = (meq (mNormal v1) (mNormal v2))
+instance Eq MValue where
+    v1 == v2 = meq (mNormal v1) (mNormal v2)
         where
           meq :: MValue -> MValue -> Bool
           -- Easy cases

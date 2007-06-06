@@ -3,7 +3,7 @@ module LineAST where
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com
 
--- import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec
 import MValue
 
 
@@ -93,7 +93,7 @@ data FunArg = FunArgExp Expression
 -- Name is what appears in the symbol table or
 -- whatever, LName is an expression which must
 -- evaluate to a Name.
-type Name = Name String | LName Expression
+data Name = Name String | LName Expression
 
 
 -- there's somehting I'm not groking wrt the standard and expressions.
@@ -114,7 +114,7 @@ type Pattern = () -- I'm hoping that MUMPS patterns can be mapped
 data UnaryOp = Not | UPlus | UMinus
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
 
-
+type SetArg=()
 
 parseCommands :: Parser [Command]
 parseCommands = do x <- command
@@ -156,15 +156,30 @@ parseDo = do stringOrPrefix "do"
                                return (cond,loc,args))
              return $ Do cond args
 
+parseElse = undefined
+parseFor = undefined
+parseGoto = undefined
+parseHa = undefined
+parseIf = undefined
+parseKill = undefined
+parseMerge = undefined
+parseNew = undefined
+parseSet = undefined
+stringOrPrefix = undefined
+parseExp=undefined
+parseLocation=undefined
+parseFunArg=undefined
+
 -- Given a parser, parse a comma separated list of these.
 mlist :: Parser a -> Parser [a]
-mlist pa = mlist1 <|> return []
+mlist pa = mlist1 pa <|> return []
 
 -- Similar to mlist, but must grab at least one
 mlist1 :: Parser a -> Parser [a]
-mlist1 pa = do x <- pa
+mlist1 pa = do 
+              x <- pa
               xs <- (do char ','
-                        mlist ps) <|> return []
+                        mlist pa) <|> return []
               return (x:xs)
 
 -- Given a parser, parse a comma separated list of these surrounded by parens
@@ -172,4 +187,5 @@ arglist :: Parser a -> Parser [a]
 arglist pa = do char '('
                 xs <- mlist pa
                 char ')'
+                return xs
          <|> return []
