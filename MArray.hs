@@ -24,7 +24,7 @@ firstKey ma = case toList ma of
 lastKey :: MArray -> Maybe MValue -- Slower than firstKey :-(
 lastKey ma = case reverse toList ma of
                []      -> Nothing
-               (v,k):_ -> Kust k
+               (v,k):_ -> Just k
 
 -- Returns the next highest subscript for the last
 -- subscript provided.  Passing false for the bool
