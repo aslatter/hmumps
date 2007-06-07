@@ -26,12 +26,15 @@ lastKey (MArray _v ma) = case (reverse .  toList) ma of
                []      -> Nothing
                (k,v):_ -> Just k
 
-arraySet :: MArray -> [MValue] -> MValue -> MArray
-arraySet (MArray  v map) [] v' =  MArray (Just v') map
-arraySet ma@(MArray _v map) (sub:subs) v' =  MArray (Just v') map' where
+arrayUpdate :: MArray -> [MValue] -> MValue -> MArray
+arrayUpdate (MArray  v map) [] v' =  MArray (Just v') map
+arrayUpdate ma@(MArray _v map) (sub:subs) v' =  MArray (Just v') map' where
 
     map' :: Map MValue MArray
-    map' = insert sub (nextArray sub ma) map
+    map' = insert sub ma' map
+
+    ma' :: MArray
+    ma' = arrayUpdate (nextArray sub ma) subs v'
 
     nextArray :: MValue -> MArray -> MArray
     nextArray v (MArray _v map) = case lookup v map of
