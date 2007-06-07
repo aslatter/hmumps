@@ -168,7 +168,7 @@ parseNew = undefined
 parseSet = undefined
 
 stringOrPrefix :: String -> Parser String
-stringOrPrefix (x:[]) = char x
+stringOrPrefix [] = return []
 stringOrPrefix (x:xs) = do y <- char x
                            ys <- stringOrPrefix xs
                                  <|> return []
