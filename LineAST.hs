@@ -116,6 +116,7 @@ data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
 
 type SetArg=()
 
+-- Parse Commands is fed a LINE of MUMPS
 parseCommands :: Parser [Command]
 parseCommands = do x <- command
                    many1 spaces -- what about comments?
