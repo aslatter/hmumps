@@ -21,10 +21,23 @@ firstKey (MArray _v ma) = case toList ma of
                 []      -> Nothing
                 (k,v):_ -> Just k
 
-lastKey :: MArray -> Maybe MValue -- Slower than firstKey :-(
+lastKey :: MArray -> Maybe MValue -- Slower than firstKey?
 lastKey (MArray _v ma) = case (reverse .  toList) ma of
                []      -> Nothing
                (k,v):_ -> Just k
+
+arraySet :: MArray -> [MValue] -> MValue -> MArray
+arraySet (MArray  v map) [] v' =  MArray (Just v') map
+arraySet ma@(MArray _v map) (sub:subs) v' =  MArray (Just v') map' where
+
+    map' :: Map MValue MArray
+    map' = insert sub (nextArray sub ma) map
+
+    nextArray :: MValue -> MArray -> MArray
+    nextArray v (MArray _v map) = case lookup v map of
+         Nothing  -> MArray Nothing empty
+         Just ma' -> ma'
+
 
 -- Returns the next highest subscript for the last
 -- subscript provided.  Passing false for the bool
