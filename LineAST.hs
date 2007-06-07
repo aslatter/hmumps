@@ -165,17 +165,21 @@ parseElse = do
   return Else
 parseFor = undefined
 parseGoto = undefined
+
 parseHa = (try parseHang) <|> parseHalt
+
 parseHang = do
   stringOrPrefix "hang"
   cond <- postCondition
   char ' '
   exp <- parseExp
   return $ Hang cond exp
+
 parseHalt = do
   stringOrPrefix "halt"
   cond <- postCondition
   return $ Halt cond
+
 parseIf = undefined
 parseKill = do 
   stringOrPrefix "kill"
