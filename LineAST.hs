@@ -147,7 +147,7 @@ postCondition = do char ':'
                    return $ Just cond
       <|> return Nothing
 
-parseDo :: Parser Command  -- doesn't work at end of line.  Make the space and args optional?
+parseDo :: Parser Command
 parseDo = do stringOrPrefix "do"
              cond <- postCondition
              char ' '
@@ -157,15 +157,37 @@ parseDo = do stringOrPrefix "do"
                                return (cond,loc,args))
              return $ Do cond args
 
-parseElse = undefined
+parseElse = do
+  stringOrPrefix "else"
+  cond <- postCondition
+  char ' '
+  char ' '
+  return Else
 parseFor = undefined
 parseGoto = undefined
-parseHa = undefined
+parseHa = (try parseHang) <|> parseHalt
+parseHang = do
+  stringOrPrefix "hang"
+  cond <- postCondition
+  char ' '
+  exp <- parseExp
+  return $ Hang cond exp
+parseHalt = do
+  stringOrPrefix "halt"
+  cond <- postCondition
+  return $ Halt cond
 parseIf = undefined
-parseKill = undefined
+parseKill = do 
+  stringOrPrefix "kill"
+  cond <- postCondition
+  killers <- sepBy killarg (char ',')
+  return $ Kill cond killers
+               
 parseMerge = undefined
 parseNew = undefined
 parseSet = undefined
+
+killarg = undefined
 
 stringOrPrefix :: String -> Parser String
 stringOrPrefix [] = return []
@@ -178,6 +200,7 @@ stringOrPrefix (x:xs) = do y <- char x
 parseExp=undefined
 parseLocation=undefined
 parseFunArg=undefined
+parseVn=undefined
 
 -- Given a parser, parse a comma separated list of these.
 mlist :: Parser a -> Parser [a]

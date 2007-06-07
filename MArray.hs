@@ -30,8 +30,8 @@ lastKey (MArray _v ma) = case (reverse .  toList) ma of
 -- updated array.
 arrayUpdate :: MArray -> [MValue] -> MValue -> MArray
 arrayUpdate (MArray  v map) [] v' =  MArray (Just v') map
-arrayUpdate ma@(MArray _v map) (sub:subs) v' =  MArray (Just v') map' where
-
+arrayUpdate ma@(MArray _ map) (sub:subs) v' =  MArray (Just v') map' where
+    
     map' :: Map MValue MArray
     map' = insert sub ma' map
 
