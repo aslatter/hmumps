@@ -26,6 +26,8 @@ lastKey (MArray _v ma) = case (reverse .  toList) ma of
                []      -> Nothing
                (k,v):_ -> Just k
 
+-- Takes an array, subscripts and a value and returns the
+-- updated array.
 arrayUpdate :: MArray -> [MValue] -> MValue -> MArray
 arrayUpdate (MArray  v map) [] v' =  MArray (Just v') map
 arrayUpdate ma@(MArray _v map) (sub:subs) v' =  MArray (Just v') map' where
@@ -36,10 +38,12 @@ arrayUpdate ma@(MArray _v map) (sub:subs) v' =  MArray (Just v') map' where
     ma' :: MArray
     ma' = arrayUpdate (nextArray sub ma) subs v'
 
-    nextArray :: MValue -> MArray -> MArray
-    nextArray v (MArray _v map) = case lookup v map of
-         Nothing  -> MArray Nothing empty
-         Just ma' -> ma'
+-- Given an Array and a Subscript reurns either the next
+-- array or an 'empty' array.
+nextArray :: MValue -> MArray -> MArray
+nextArray v (MArray _v map) = case lookup v map of
+    Nothing  -> MArray Nothing empty
+    Just ma' -> ma'
 
 
 -- Returns the next highest subscript for the last
