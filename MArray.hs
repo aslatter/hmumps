@@ -7,22 +7,22 @@ import Data.Map
 import MValue
 import Prelude hiding (lookup)
 
-type MArray = (Maybe MValue, Map MValue MArray)
+Data MArray = MArray (Maybe MValue) Map MValue MArray)
 
 -- Given an MArray an d a list of subscripts, maybe
 -- return the value associated with those subs.
 mIndex :: MArray -> [MValue] -> Maybe MValue
-mIndex (v, _map) []     = v
-mIndex (v, map)  (x:xs) = do vc <- lookup x map
+mIndex (MArray v _map) []     = v
+mIndex (MArray v  map)  (x:xs) = do vc <- lookup x map
                              mIndex vc xs
 
 firstKey :: MArray -> Maybe MValue
-firstKey ma = case toList ma of
+firstKey (MArray _v ma) = case toList ma of
                 []      -> Nothing
                 (v,k):_ -> Just k
 
 lastKey :: MArray -> Maybe MValue -- Slower than firstKey :-(
-lastKey ma = case reverse toList ma of
+lastKey (MArray _v ma) = case reverse toList ma of
                []      -> Nothing
                (v,k):_ -> Just k
 
@@ -31,11 +31,11 @@ lastKey ma = case reverse toList ma of
 -- gives the next lowest, instead.
 order :: MArray -> Bool -> [MValue] -> Maybe MValue
 -- Forward search
-order (_,map) forward (mv:[]) = let (map1, map2) = split mv map in
+order (MArray _v map) forward (mv:[]) = let (map1, map2) = split mv map in
   if forward
      then firstKey map2
      else lastKey  map1
-order (_,map) forward (mv:ms) = do vc <- lookup mv map
+order (MArray _v map) forward (mv:ms) = do vc <- lookup mv map
                                    order vc forward ms
 
 -- Given an array and subscripts, returns the "next" set
