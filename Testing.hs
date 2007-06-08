@@ -23,3 +23,14 @@ instance Arbitrary MValue where
     coarbitrary (String s) = variant 0 . coarbitrary s
     coarbitrary (Number n) = variant 1 . coarbitrary n
     coarbitrary (Float f) = variant 2 . coarbitrary f
+
+
+
+testStringCast mv = mString mv == mv
+      where types = mv :: MValue
+
+testNumericCast f = Number f == (mNum . mString . Number) f
+      where types = f :: Integer
+
+testTrailingZero n = (mString . Number) n == (mString . Float . fromIntegral) n
+      where types = n :: Integer
