@@ -16,7 +16,7 @@ data MValue = String String
                       -- MArray to work.
 
 instance Eq MValue where
-    v1 == v2 = meq (mNormal v1) (mNormal v2)
+    v1 == v2 = meq v1 v2
         where
           meq :: MValue -> MValue -> Bool
           -- Easy cases
@@ -26,17 +26,17 @@ instance Eq MValue where
           -- Simple numeric cases
           meq (Number n)  (Float f) = f == (fromInteger n)
           meq (Float f)   (Number n) = f == (fromInteger n)
-          -- All that's left is false
-          meq (String _) (Float  _) = False
-          meq (String _) (Number _) = False
-          meq (Float  _) (String _) = False
-          meq (Number _) (String _) = False
-          -- The above should catch everything
+          -- Last, conversion to strings
+          meq ms@(String s) mv = ms == mString mv
+          meq mv ms@(String s) = ms == mString mv
+
 
 -- Cast to String
 mString :: MValue -> MValue
 mString (Number n)   = String $ show n
-mString (Float f)    = String $ show f
+mString (Float f)    = String $ if show f == (show . (/ 1.0)  . fromIntegral . truncate) f
+                                then (show . truncate) f
+                                else show f
 mString x@(String _) = x
 
 
