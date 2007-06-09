@@ -32,6 +32,7 @@ instance Eq MValue where
 
 
 -- Cast to String
+-- I'm not sure about how I handle floats.
 mString :: MValue -> MValue
 mString (Number n)   = String $ show n
 mString (Float f)    = String $ if show f == (show . (/ 1.0)  . fromIntegral . truncate) f
@@ -52,7 +53,10 @@ mNum (String s) = if isSpace (head s) then Number 0 else
 mNum x@(_) = x
 
 
--- "Normal" form of a string (used for Ord and Eq)
+-- NOTE: Sorting order (wrt insertion into an Array)
+-- is DIFFERENT from "follows" order.
+
+-- "Normal" form of a string (used for Ord)
 -- If a String can be represented as a Number or a Float
 -- without a loss of information, then do so. 
 --

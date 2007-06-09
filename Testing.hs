@@ -32,5 +32,8 @@ testStringCast mv = mString mv == mv
 testNumericCast f = Number f == (mNum . mString . Number) f
       where types = f :: Integer
 
+
+-- Displayed whole numbers should not have trailing zeros.  This is a check
+-- on that.
 testTrailingZero n = (mString . Number) n == (mString . Float . fromIntegral) n
       where types = n :: Integer

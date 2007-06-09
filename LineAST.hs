@@ -113,6 +113,7 @@ type Pattern = () -- I'm hoping that MUMPS patterns can be mapped
 
 data UnaryOp = Not | UPlus | UMinus
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
+-- missing a few binops.  not sure where ], [, and ]] are in the spec
 
 type SetArg=()
 
