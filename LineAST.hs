@@ -118,10 +118,20 @@ type SetArg=()
 
 -- Parse Commands is fed a LINE of MUMPS
 parseCommands :: Parser [Command]
-parseCommands = do x <- command
-                   many1 spaces -- what about comments?
-                   xs <- (parseCommands <|> return [])
-                   return (x:xs)
+parseCommands = do many spaces
+                   (do x <- command;
+                       xs <- parseCommands;
+                       return (x:xs)) <|> (do comment;
+                                              return []) <|> (return [])
+-- I think I do this wrong, because I'm not sure what happens on
+-- mal-formed input.  anyway, I think it's better than it was.
+
+
+-- munch comments
+comment :: Parser String
+comment = do char ';'
+             -- How do I match everything?
+             undefined
 
 command :: Parser Command
 command = parseBreak
