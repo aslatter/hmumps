@@ -221,7 +221,32 @@ stringOrPrefix1 (x:xs) = do y <- char x
 parseExp=undefined
 parseLocation=undefined
 parseFunArg=undefined
-parseVn=undefined
+
+parseVn :: Parser Vn
+parseVn = (do char '@'
+              exp <- parseExp
+              args <- (do char '@'
+                          arglist parseExp) <|> return []
+              return $ IndirectVn exp args)
+      <|> (do char '^'
+              name <- litName
+              args <- arglist parseExp
+              return $ Gvn (Name name) args)
+      <|> (do name <- litName
+              args <- arglist parseExp
+              return $ Lvn (Name name) args)
+
+-- Parses a literal name.
+litName :: Parser String
+litName = do x <- oneOf (return '%' ++ ident)
+             xs <- many (oneOf (ident ++ digits))
+             return $ x:xs
+ where ident = ['a'..'z'] ++ ['A'..'Z']
+       digits = ['0'..'9']
+                         
+
+
+             
 
 -- Given a parser, parse a comma separated list of these.
 mlist :: Parser a -> Parser [a]
