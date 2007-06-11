@@ -115,7 +115,10 @@ data UnaryOp = Not | UPlus | UMinus
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
 -- missing a few binops.  not sure where ], [, and ]] are in the spec
 
-type SetArg=()
+-- I don't know why I hadn't defined this earlier.
+-- I'm glad I hadn't - it liekly would've been
+-- more complicated.
+type SetArg=([Vn],Expression)
 
 -- Parse Commands is fed a LINE of MUMPS
 parseCommands :: Parser [Command]
