@@ -148,7 +148,7 @@ command = parseBreak
       <|> parseSet
 
 parseBreak :: Parser Command
-parseBreak = do stringOrPrefix "break"
+parseBreak = do stringOrPrefix1 "break"
                 cond <- postCondition
                 return $ Break cond
 
@@ -159,7 +159,7 @@ postCondition = do char ':'
       <|> return Nothing
 
 parseDo :: Parser Command
-parseDo = do stringOrPrefix "do"
+parseDo = do stringOrPrefix1 "do"
              cond <- postCondition
              char ' '
              args <- mlist (do loc <- parseLocation
@@ -169,31 +169,35 @@ parseDo = do stringOrPrefix "do"
              return $ Do cond args
 
 parseElse = do
-  stringOrPrefix "else"
+  stringOrPrefix1 "else"
   cond <- postCondition
   char ' '
   char ' '
   return Else
+
 parseFor = undefined
 parseGoto = undefined
 
-parseHa = (try parseHang) <|> parseHalt
+parseHa :: Parser Command
+parseHa = do stringOrPrefix1 "ha"
+             (parseHang <|> parseHalt)
+             
 
 parseHang = do
-  stringOrPrefix "hang"
+  stringOrPrefix "ng"
   cond <- postCondition
   char ' '
   exp <- parseExp
   return $ Hang cond exp
 
 parseHalt = do
-  stringOrPrefix "halt"
+  stringOrPrefix "lt"
   cond <- postCondition
   return $ Halt cond
 
 parseIf = undefined
 parseKill = do 
-  stringOrPrefix "kill"
+  stringOrPrefix1 "kill"
   cond <- postCondition
   killers <- sepBy killarg (char ',')
   return $ Kill cond killers
@@ -205,11 +209,13 @@ parseSet = undefined
 killarg = undefined
 
 stringOrPrefix :: String -> Parser String
-stringOrPrefix [] = return []
-stringOrPrefix (x:xs) = do y <- char x
-                           ys <- stringOrPrefix xs
-                                 <|> return []
-                           return (y:ys)
+stringOrPrefix str = stringOrPrefix1 str <|> return []
+
+stringOrPrefix1 :: String -> Parser String
+stringOrPrefix1 [] = return []
+stringOrPrefix1 (x:xs) = do y <- char x
+                            ys <- stringOrPrefix xs
+                            return (y:ys)
 
 
 parseExp=undefined
