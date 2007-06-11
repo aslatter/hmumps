@@ -227,7 +227,7 @@ parseVn=undefined
 mlist :: Parser a -> Parser [a]
 mlist pa = mlist1 pa <|> return []
 
--- Similar to mlist, but must grab at least one
+-- Similar to mlist, but must grab at least one element
 mlist1 :: Parser a -> Parser [a]
 mlist1 pa = do 
               x <- pa
