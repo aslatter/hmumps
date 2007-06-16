@@ -19,13 +19,22 @@ The goal of the {\sc hmumps} project is to gain an understanding of {\sc mumps},
 \subsection{Line-based}
 
 The key data-structure is the {\em Command},  which denotes the execution of a single {\sc MUMPS} command.
+The data structure denotes which command is to be run, and all arguments and information involved in the execution of that particular command.
+The execution of a command may impact both the symbol table, user IO and the nature in which the run-time environment chooses the next command to execute.
 
-\subsection{Code-flow based}
 
 
 \section{Run-time Environment}
 
+I had initialy thought that a good model of execution would be nested zippers on lists (the outer on for the line in a routine, the inner one for the command on a line) but I've come to believe that this isn't such a good idea.
+The zipper on a list is excellent for the case where you want to zig-zag through a list, but in the case of a for-loop, I never want to go backwards through a particular line.
+Maybe a better model would just be a fixed-length array plus a counter or something.
+Or maybe keep the zipper on lines in a routine, but just have it contain a straight list.
+This is going to require some design work.
 
+\section{Other design notes}
+
+I'm thinking that the {\em for} command will have a primitive {\em for} (which is just the argumentless {\em for}), and then syntactic sugar which adds {\em set}s and postconditional {\em quit}s into the mix.
 
 
 \end{document}
