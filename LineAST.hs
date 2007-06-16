@@ -109,7 +109,7 @@ data Expression = ExpLit MValue
 type Pattern = () -- I'm hoping that MUMPS patterns can be mapped
                   -- directly onto regexs.  I can't find any useful
                   -- documentation on regexs in Haskell.  Even if
-                  --  I could, I don't know regexs anyway.
+                  -- I could, I don't know regexs anyway.
 
 data UnaryOp = Not | UPlus | UMinus
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
@@ -171,6 +171,7 @@ parseDo = do stringOrPrefix1 "do"
                                return (cond,loc,args))
              return $ Do cond args
 
+-- Will not work for an end-or-line do statment
 parseElse = do
   stringOrPrefix1 "else"
   cond <- postCondition
@@ -254,6 +255,7 @@ litName = do x <- oneOf (return '%' ++ ident)
 -- Given a parser, parse a comma separated list of these.
 mlist :: Parser a -> Parser [a]
 mlist pa = mlist1 pa <|> return []
+
 
 -- Similar to mlist, but must grab at least one element
 mlist1 :: Parser a -> Parser [a]
