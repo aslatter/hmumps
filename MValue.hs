@@ -11,9 +11,7 @@ import Char
 data MValue = String String
             | Number Integer
             | Float  Float
- deriving (Show, Ord) -- The Ord derivation is BAD
-                      -- but I need something for
-                      -- MArray to work.
+ deriving (Show)
 
 -- I think is is proper MUMPS equality.
 -- I need to write some tests to be sure.
@@ -36,6 +34,18 @@ instance Eq MValue where
           -- Last, conversion to strings
           meq ms@(String s) mv = ms == mString mv
           meq mv ms@(String s) = ms == mString mv
+
+-- Seeing as Ord is used for insert into maps, I can't
+-- use the same Ord for the MUMPS gt and lt operators,
+-- which work in a numeric context (all strings being
+-- zero).
+instance Ord MValue where
+    compare (String s1) (String s2) = compare s1 s2
+    compare (String s1) mv = let (String s2) = mString mv in compare s1 s2
+    compare mv (String s2) = let (String s1) = mString mv in compare s1 s2
+    compare mv1 mv2 = let (String s1) = mString mv1
+                          (String s2) = mString mv2 in
+                      compare s1 s2
 
 
 -- Cast to String
