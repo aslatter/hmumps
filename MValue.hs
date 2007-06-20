@@ -15,6 +15,13 @@ data MValue = String String
                       -- but I need something for
                       -- MArray to work.
 
+-- I think is is proper MUMPS equality.
+-- I need to write some tests to be sure.
+-- The key thing to watch out for is that
+-- 1.0 <> "1.0", in fact 1.0 == "1".  That
+-- is, numeric literals should be striped down
+-- to the "canonical" numeric form before being
+-- represented as a string.
 instance Eq MValue where
     v1 == v2 = meq v1 v2
         where
@@ -62,6 +69,12 @@ mNum x@(_) = x
 --
 -- TODO: make this comply with 7.1.4.3 of the standard
 --  wrt leading and trailing zeros
+--
+-- I really need to read the spec better before I do
+-- $O sort-order for reals.  Also, so since $O sort order
+-- is dynamic, (or at least environment dependent) I'm not
+-- sure if it should really be hard-coded into the Ord
+-- instance.
 mNormal :: MValue -> MValue
 mNormal ms@(String s) = if isSpace (head s) then ms else
     case (reads s :: [(Integer,String)]) of
