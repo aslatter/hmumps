@@ -40,7 +40,6 @@ nextArray v (MArray _v map) = case lookup v map of
 -- subscript provided.  Passing false for the bool
 -- gives the next lowest, instead.
 order :: MArray -> Bool -> [MValue] -> Maybe MValue
--- Forward search
 order (MArray _ map) forward (mv:[]) = let (map1, map2) = split mv map in
   if forward
      then if null map2 then Nothing
