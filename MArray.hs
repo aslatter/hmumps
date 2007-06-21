@@ -5,7 +5,7 @@ module MArray where
 
 import Data.Map
 import MValue
-import Prelude hiding (lookup)
+import Prelude hiding (lookup,null)
 
 data MArray = MArray (Maybe MValue) (Map MValue MArray)
 
@@ -15,16 +15,6 @@ mIndex :: MArray -> [MValue] -> Maybe MValue
 mIndex (MArray v _map) []     = v
 mIndex (MArray v  map)  (x:xs) = do vc <- lookup x map
                                     mIndex vc xs
-
-firstKey :: MArray -> Maybe MValue
-firstKey (MArray _v ma) = case toList ma of
-                []      -> Nothing
-                (k,v):_ -> Just k
-
-lastKey :: MArray -> Maybe MValue -- Slower than firstKey?
-lastKey (MArray _v ma) = case (reverse .  toList) ma of
-               []      -> Nothing
-               (k,v):_ -> Just k
 
 -- Takes an array, subscripts and a value and returns the
 -- updated array.
@@ -51,12 +41,15 @@ nextArray v (MArray _v map) = case lookup v map of
 -- gives the next lowest, instead.
 order :: MArray -> Bool -> [MValue] -> Maybe MValue
 -- Forward search
-order (MArray _v map) forward (mv:[]) = let (map1, map2) = split mv map in
+order (MArray _ map) forward (mv:[]) = let (map1, map2) = split mv map in
   if forward
-     then firstKey $ MArray undefined map2
-     else lastKey  $ MArray undefined map1
-order (MArray _v map) forward (mv:ms) = do vc <- lookup mv map
-                                           order vc forward ms
+     then if null map2 then Nothing
+          else let (k,_) = findMin map2 in Just k
+     else if null map1 then Nothing
+          else let (k,_) = findMax map1 in Just k
+order (MArray _ map) forward (mv:ms) = do vc <- lookup mv map
+                                          order vc forward ms
+
 
 -- Given an array and subscripts, returns the "next" set
 -- of subscripts.  The spec is a bit hard to read on this.
