@@ -85,7 +85,8 @@ data Vn = Lvn Name [Subscript] -- these two will only ever
         | Gvn Name [Subscript] -- be direct names.  Maybe.
         | IndirectVn Expression [Subscript]
 
-
+-- A funarg can be an expression, or the name of a local to pass
+-- in by reference (I think this is what I meant?)
 data FunArg = FunArgExp Expression
             | FunArgName Name
 
@@ -120,7 +121,7 @@ data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
 -- more complicated.
 type SetArg=([Vn],Expression)
 
--- Parse Commands is fed a LINE of MUMPS
+-- Parse Commands is fed a LINE of MUMPS (after line-level is determined)
 parseCommands :: Parser [Command]
 parseCommands = do many spaces
                    (do x <- command;
@@ -161,6 +162,7 @@ postCondition = do char ':'
                    return $ Just cond
       <|> return Nothing
 
+-- Will not work for an end-of-line statement
 parseDo :: Parser Command
 parseDo = do stringOrPrefix1 "do"
              cond <- postCondition
@@ -171,7 +173,7 @@ parseDo = do stringOrPrefix1 "do"
                                return (cond,loc,args))
              return $ Do cond args
 
--- Will not work for an end-or-line do statment
+-- Will not work for an end-of-line do statment
 parseElse = do
   stringOrPrefix1 "else"
   cond <- postCondition
