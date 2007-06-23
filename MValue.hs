@@ -40,12 +40,17 @@ instance Eq MValue where
 -- which work in a numeric context (all strings being
 -- zero).
 instance Ord MValue where
+    compare (Number i1) (Number i2) = compare i1 i2
+    compare (Float  f1) (Float  f2) = compare f1 f2
+    --
+    compare (Number i1) (Float  f2) = compare (fromIntegral i1) f2
+    compare (Float  f1) (Number i2) = compare f1 (fromIntegral i2)
+    --
+    compare mv1 mv2 | (isNum mv1) && (isNum mv2) = compare (mNum mv1) (mNum mv2)
+    -- 
     compare (String s1) (String s2) = compare s1 s2
     compare (String s1) mv = let (String s2) = mString mv in compare s1 s2
     compare mv (String s2) = let (String s1) = mString mv in compare s1 s2
-    compare mv1 mv2 = let (String s1) = mString mv1
-                          (String s2) = mString mv2 in
-                      compare s1 s2
 
 
 -- Cast to String
