@@ -52,7 +52,7 @@ instance Ord MValue where
 -- I'm not sure about how I handle floats.
 mString :: MValue -> MValue
 mString (Number n)   = String $ show n
-mString (Float f)    = String $ if show f == (show . (/ 1.0)  . fromIntegral . truncate) f
+mString (Float f)    = String $ if f == (fromIntegral . truncate) f
                                 then (show . truncate) f
                                 else show f
 mString x@(String _) = x
@@ -61,6 +61,11 @@ mString x@(String _) = x
 -- Cast to Number|Float
 mNum :: MValue -> MValue
 mNum (String [])  = Number 0
+mNum (String ('+':s)) = mNum $ String s
+mNum (String ('-':s)) = case mNum (String s) of
+                          Number 0 -> Number 0
+                          Number n -> Number (- n)
+                          Float  n -> Float  (- n)
 mNum (String s) = if isSpace (head s) then Number 0 else
   case (reads s :: [(Integer,String)]) of
     (i,s):[] -> Number i
@@ -69,27 +74,9 @@ mNum (String s) = if isSpace (head s) then Number 0 else
                   _        -> Number 0
 mNum x@(_) = x
 
-
--- NOTE: Sorting order (wrt insertion into an Array)
--- is DIFFERENT from "follows" order.
-
--- "Normal" form of a string (used for Ord)
--- If a String can be represented as a Number or a Float
--- without a loss of information, then do so. 
---
--- TODO: make this comply with 7.1.4.3 of the standard
---  wrt leading and trailing zeros
---
--- I really need to read the spec better before I do
--- $O sort-order for reals.  Also, so since $O sort order
--- is dynamic, (or at least environment dependent) I'm not
--- sure if it should really be hard-coded into the Ord
--- instance.
-mNormal :: MValue -> MValue
-mNormal ms@(String s) = if isSpace (head s) then ms else
-    case (reads s :: [(Integer,String)]) of
-      (i,[]):[] -> Number i
-      _        -> case (reads s :: [(Float,String)]) of
-                    (f,[]):[] -> Float f
-                    _         -> ms 
-mNormal x@(_) = x
+-- Tests to see if an MValue is a number.
+-- Note that a String can pass this test.
+isNum :: MValue -> Bool
+isNum (Number _) = True
+isNum (Float  _) = True
+isNum mv = mv == mNum mv
