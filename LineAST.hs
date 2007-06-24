@@ -103,13 +103,13 @@ data Name = Name String | LName Expression
 -- The "Expression" type will ikely be the last thing I define.
 data Expression = ExpLit MValue 
                 | ExpVn Vn
-                | ExpUnary UnaryOp Expression
-                | BinaryOp BinOp Expression Expression
+                | ExpUnop UnaryOp Expression
+                | ExpBinop BinOp Expression Expression
                 | BIFCall String [Expression]
                 | Funcal  String (Maybe String) [Expression]
                 | Pattern Expression Regex
 
-data UnaryOp = Not | UPlus | UMinus
+data UnaryOp = UNot | UPlus | UMinus
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
 -- missing a few binops.  not sure where ], [, and ]] are in the spec
 
@@ -220,8 +220,51 @@ stringOrPrefix1 (x:xs) = do y <- char x
                             ys <- stringOrPrefix xs
                             return (y:ys)
 
+-- This is the big one.  Hopefully I've properly left-factored it.
+parseExp :: Parser Expression
+parseExp = do exp1 <- (parseExpUnop <|> parseExpVn <|> parseExpBIF <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
+              parseBinopTrail exp1 <|> parsePatmatchTrail exp1 <|> (return exp1) 
+ where 
 
-parseExp=undefined
+   parseBinopTrail :: Expression -> Parser Expression
+   parseBinopTrail exp1 = do binop <- parseBinop
+                             exp2 <- parseExp
+                             return $ ExpBinop binop exp1 exp2
+   
+   parsePatmatchTrail exp1 = undefined
+
+parseExpUnop :: Parser Expression
+parseExpUnop = do op <-  parseUnop
+                  exp <- parseExp
+                  return $ ExpUnop op exp
+
+parseUnop :: Parser UnaryOp
+parseUnop = (do char '!'; return UNot)
+        <|> (do char '+'; return UPlus)
+        <|> (do char '-'; return UMinus)
+
+parseExpVn :: Parser Expression
+parseExpVn = do vn <- parseVn
+                return $ ExpVn vn
+
+parseExpBIF = undefined
+parseExpFuncall = undefined
+
+parseSubExp :: Parser Expression
+parseSubExp = do char '('
+                 exp <- parseExp
+                 char ')'
+                 return exp
+
+-- Take a positive number or a string.  Any leading -/+ signs should've
+-- been picked up by parseExpUnop by now.
+parseExpLit :: Parser Expression
+parseExpLit = undefined
+
+parseBinop = undefined
+
+--
+
 parseLocation=undefined
 parseFunArg=undefined
 
