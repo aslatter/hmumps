@@ -35,10 +35,9 @@ instance Eq MValue where
           meq ms@(String s) mv = ms == mString mv
           meq mv ms@(String s) = ms == mString mv
 
--- Seeing as Ord is used for insert into maps, I can't
--- use the same Ord for the MUMPS gt and lt operators,
--- which work in a numeric context (all strings being
--- zero).
+-- This instance of Ord gives proper sorting in an
+-- MArray, but does NOT give proper results for the
+-- MUMPS gt an lt operators.
 instance Ord MValue where
     compare (Number i1) (Number i2) = compare i1 i2
     compare (Float  f1) (Float  f2) = compare f1 f2
