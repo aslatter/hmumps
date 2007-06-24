@@ -4,6 +4,8 @@ module LineAST where
 -- aslatter@gmail.com
 
 import Text.ParserCombinators.Parsec
+import Text.Regex
+
 import MValue
 
 
@@ -105,12 +107,7 @@ data Expression = ExpLit MValue
                 | BinaryOp BinOp Expression Expression
                 | BIFCall String [Expression]
                 | Funcal  String (Maybe String) [Expression]
-                | Pattern Expression Pattern
-
-type Pattern = () -- I'm hoping that MUMPS patterns can be mapped
-                  -- directly onto regexs.  I can't find any useful
-                  -- documentation on regexs in Haskell.  Even if
-                  -- I could, I don't know regexs anyway.
+                | Pattern Expression Regex
 
 data UnaryOp = Not | UPlus | UMinus
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
