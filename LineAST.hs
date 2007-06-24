@@ -239,7 +239,7 @@ parseExpUnop = do op <-  parseUnop
                   return $ ExpUnop op exp
 
 parseUnop :: Parser UnaryOp
-parseUnop = (do char '!'; return UNot)
+parseUnop = (do char '\''; return UNot)
         <|> (do char '+'; return UPlus)
         <|> (do char '-'; return UMinus)
 
