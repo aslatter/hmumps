@@ -231,7 +231,8 @@ parseExp = do exp1 <- (parseExpUnop <|> parseExpVn <|> parseExpBIF <|> parseExpF
                              exp2 <- parseExp
                              return $ ExpBinop binop exp1 exp2
    
-   parsePatmatchTrail exp1 = undefined
+   parsePatmatchTrail exp1 = do char '?'
+                                undefined
 
 parseExpUnop :: Parser Expression
 parseExpUnop = do op <-  parseUnop
