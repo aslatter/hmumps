@@ -238,6 +238,8 @@ stringOrPrefix1 (x:xs) = do y <- char x
                             return (y:ys)
 
 -- This is the big one.  Hopefully I've properly left-factored it.
+-- TODO: make '<BINOP> work
+--       make binops left associative, instead of right
 parseExp :: Parser Expression
 parseExp = do exp1 <- (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
               parseBinopTrail exp1 <|> parsePatmatchTrail exp1 <|> (return exp1) 
@@ -291,14 +293,25 @@ parseStringLit = do char '"'
                     char '"'
                     (return . ExpLit . String) xs
 
-parseBinop = do op <- oneOf ('\\':"+-/_!&[]")
-                error "parseBinop not implemented"
+-- No guarantees that the list of binops is complete.
+parseBinop = (char '_'  >> return Concat)
+         <|> (char '+'  >> return Add)
+         <|> (char '-'  >> return Sub)
+         <|> (char '*'  >> ((char '*' >> return Pow) <|> return Mult))
+         <|> (char '/'  >> return Div)
+         <|> (char '#'  >> return Rem)
+         <|> (char '\\' >> return Quot)
 
+-- I don't remember where I use this
 parseLocation = error "parseLocation not implemented"
 
+-- Differs from parseExp because a funarg may be either:
+--  * An Expression
+--  * A (local?) variable passed by ref
 parseFunArg :: Parser FunArg
 parseFunArg = error "parseFunArg not implemented"
 
+-- Parses the name of a variable (with subscripts)
 parseVn :: Parser Vn
 parseVn = (do char '@'
               exp <- parseExp
