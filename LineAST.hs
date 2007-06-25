@@ -43,17 +43,20 @@ data Command = Break (Maybe Condition)
              | Merge (Maybe Condition) [MergeArg]
              | New (Maybe Condition) [NewArg]
              | Set (Maybe Condition) [SetArg]
-
+ deriving Show
 
 -- Location stuff used by Do, Goto &c. Section 8.1.6.1
 data Location = Routine Routineref
               | Subroutine DLabel (Maybe Integer) Routineref
+ deriving Show
 
 data DLabel = DLabel String 
             | DLabelIndirect Expression
+ deriving Show
 
 data Routineref = Routineref (Maybe String) String
                 | RoutinerefIndirect Expression
+ deriving Show
 
 
 type Condition = Expression
@@ -63,11 +66,13 @@ type Subscript = Expression
 data ForArg = For1 Expression
             | For2 Expression Expression
             | For3 Expression Expression Expression
+ deriving Show
 
 -- See 8.2.11
 data KillArg = KillSelective Vn
              | KillExclusive [Name]
              | KillIndirect  Expression
+ deriving Show
 
 -- See 8.2.13
 type MergeArg = (Vn,Vn)
@@ -81,22 +86,26 @@ type MergeArg = (Vn,Vn)
 data NewArg = NewSelective Name
             | NewExclusive [Name]
             | NewIndirect  Expression
+ deriving Show
 
 -- Variable names: 7.1.2
 data Vn = Lvn Name [Subscript] -- these two will only ever
         | Gvn Name [Subscript] -- be direct names.  Maybe.
         | IndirectVn Expression [Subscript]
+ deriving Show
 
 -- A funarg can be an expression, or the name of a local to pass
 -- in by reference (I think this is what I meant?)
 data FunArg = FunArgExp Expression
             | FunArgName Name
+ deriving Show
 
 -- Titles of routines, tags and variables.
 -- Name is what appears in the symbol table or
 -- whatever, LName is an expression which must
 -- evaluate to a Name.
 data Name = Name String | LName Expression
+ deriving Show
 
 
 -- there's somehting I'm not groking wrt the standard and expressions.
@@ -107,11 +116,19 @@ data Expression = ExpLit MValue
                 | ExpBinop BinOp Expression Expression
                 | BIFCall String [Expression]
                 | Funcal  String (Maybe String) [Expression]
-                | Pattern Expression Regex
+                | Pattern Expression PatArg
+ deriving Show
 
 data UnaryOp = UNot | UPlus | UMinus
+ deriving Show
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
+ deriving Show
 -- missing a few binops.  not sure where ], [, and ]] are in the spec
+
+data PatArg = PatArg Regex
+
+instance Show PatArg where
+    show (PatArg r) = "PatArg <Regex>"
 
 -- I don't know why I hadn't defined this earlier.
 -- I'm glad I hadn't - it liekly would've been
@@ -222,7 +239,7 @@ stringOrPrefix1 (x:xs) = do y <- char x
 
 -- This is the big one.  Hopefully I've properly left-factored it.
 parseExp :: Parser Expression
-parseExp = do exp1 <- (parseExpUnop <|> parseExpVn <|> parseExpBIF <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
+parseExp = do exp1 <- (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
               parseBinopTrail exp1 <|> parsePatmatchTrail exp1 <|> (return exp1) 
  where 
 
@@ -232,7 +249,7 @@ parseExp = do exp1 <- (parseExpUnop <|> parseExpVn <|> parseExpBIF <|> parseExpF
                              return $ ExpBinop binop exp1 exp2
    
    parsePatmatchTrail exp1 = do char '?'
-                                undefined
+                                error "parsePatmatchTrail not implemented"
 
 parseExpUnop :: Parser Expression
 parseExpUnop = do op <-  parseUnop
@@ -248,8 +265,8 @@ parseExpVn :: Parser Expression
 parseExpVn = do vn <- parseVn
                 return $ ExpVn vn
 
-parseExpBIF = undefined
-parseExpFuncall = undefined
+parseExpFuncall = do char '$'
+                     error "parseExpFuncall undefined"
 
 parseSubExp :: Parser Expression
 parseSubExp = do char '('
@@ -260,14 +277,27 @@ parseSubExp = do char '('
 -- Take a positive number or a string.  Any leading -/+ signs should've
 -- been picked up by parseExpUnop by now.
 parseExpLit :: Parser Expression
-parseExpLit = undefined
+parseExpLit = parseNumLit <|> parseStringLit
 
-parseBinop = undefined
+-- Does not work  with scientific notation yet
+parseNumLit :: Parser Expression
+parseNumLit = do xs <- many1 digit
+                 (do char '.'; ys <- many1 digit; (return . ExpLit . Float . read)  (xs ++ ['.'] ++ ys))
+                  <|> (return . ExpLit. Number .read) xs
 
---
+-- Does not work for quote-marks inside a string
+parseStringLit = do char '"'
+                    xs <- many (noneOf "\"")
+                    char '"'
+                    (return . ExpLit . String) xs
 
-parseLocation=undefined
-parseFunArg=undefined
+parseBinop = do op <- oneOf ('\\':"+-/_!&[]")
+                error "parseBinop not implemented"
+
+parseLocation = error "parseLocation not implemented"
+
+parseFunArg :: Parser FunArg
+parseFunArg = error "parseFunArg not implemented"
 
 parseVn :: Parser Vn
 parseVn = (do char '@'
