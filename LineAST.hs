@@ -236,9 +236,7 @@ stringOrPrefix1 (x:xs) = do y <- char x
                             ys <- stringOrPrefix xs
                             return (y:ys)
 
--- This is the big one.  Hopefully I've properly left-factored it.
--- TODO: make '<BINOP> work
---       make binops left associative, instead of right
+-- Parse an expression.  Is not at all forgiving about extraneous whitespace.
 parseExp :: Parser Expression
 parseExp = do let parseExpAtom :: Parser Expression
                   parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
