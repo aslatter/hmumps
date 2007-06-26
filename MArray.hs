@@ -11,8 +11,10 @@ data MArray = MArray (Maybe MValue) (Map MValue MArray)
 
 -- Given an MArray and a list of subscripts, maybe
 -- return the value associated with those subs.
-mIndex :: MArray -> [MValue] -> Maybe MValue
-mIndex (MArray v _map) []     = v
+mIndex :: Monad m => MArray -> [MValue] -> m MValue
+mIndex (MArray v _map) []     = case v of
+                                  Nothing -> fail "mIndex: value not set at specified index"
+                                  Just mv -> return mv
 mIndex (MArray v  map)  (x:xs) = do vc <- lookup x map
                                     mIndex vc xs
 
@@ -39,13 +41,13 @@ nextArray v (MArray _v map) = case lookup v map of
 -- Returns the next highest subscript for the last
 -- subscript provided.  Passing false for the bool
 -- gives the next lowest, instead.
-order :: MArray -> Bool -> [MValue] -> Maybe MValue
+order :: Monad m => MArray -> Bool -> [MValue] -> m MValue
 order (MArray _ map) forward (mv:[]) = let (map1, map2) = split mv map in
   if forward
-     then if null map2 then Nothing
-          else let (k,_) = findMin map2 in Just k
-     else if null map1 then Nothing
-          else let (k,_) = findMax map1 in Just k
+     then if null map2 then fail "Order: no higher indices"
+          else let (k,_) = findMin map2 in return k
+     else if null map1 then fail "Order: no lower indices"
+          else let (k,_) = findMax map1 in return k
 order (MArray _ map) forward (mv:ms) = do vc <- lookup mv map
                                           order vc forward ms
 
