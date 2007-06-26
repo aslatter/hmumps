@@ -116,8 +116,11 @@ data Expression = ExpLit MValue
                 | ExpBinop BinOp Expression Expression
                 | BIFCall String [Expression]
                 | Funcal  String (Maybe String) [Expression]
-                | Pattern Expression PatArg
+                | Pattern Expression Regex
  deriving Show
+
+instance Show Regex where
+    show _ = "<Regex>"
 
 data UnaryOp = UNot | UPlus | UMinus
  deriving Show
@@ -125,10 +128,6 @@ data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
  deriving Show
 -- missing a few binops.  not sure where ], [, and ]] are in the spec
 
-data PatArg = PatArg Regex
-
-instance Show PatArg where
-    show (PatArg r) = "PatArg <Regex>"
 
 -- I don't know why I hadn't defined this earlier.
 -- I'm glad I hadn't - it liekly would've been
@@ -241,22 +240,29 @@ stringOrPrefix1 (x:xs) = do y <- char x
 -- TODO: make '<BINOP> work
 --       make binops left associative, instead of right
 parseExp :: Parser Expression
-parseExp = do exp1 <- (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
-              parseBinopTrail exp1 <|> parsePatmatchTrail exp1 <|> (return exp1) 
- where 
+parseExp = do let parseExpAtom :: Parser Expression
+                  parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
 
-   parseBinopTrail :: Expression -> Parser Expression
-   parseBinopTrail exp1 = do binop <- parseBinop
-                             exp2 <- parseExp
-                             return $ ExpBinop binop exp1 exp2
-   
-   parsePatmatchTrail exp1 = do char '?'
-                                error "parsePatmatchTrail not implemented"
+                  parseExpUnop :: Parser Expression
+                  parseExpUnop = (do unop <- parseUnop; exp <- parseExpAtom; return $ ExpUnop unop exp)
 
-parseExpUnop :: Parser Expression
-parseExpUnop = do op <-  parseUnop
-                  exp <- parseExp
-                  return $ ExpUnop op exp
+                  parseWrapper :: Parser ((Expression -> Expression) -> Expression -> Expression)
+                  parseWrapper = (do char '\''; return $ \f x -> ExpUnop UNot (f x)) <|> (return id)
+
+                  parseTailItem :: Parser (Expression -> Expression)
+                  parseTailItem = (do wrapper <- parseWrapper;
+                                      binop <- parseBinop;
+                                      exp <- parseExpAtom;
+                                      return $ wrapper  $ \x -> ExpBinop binop x exp)
+                              <|> (do wrapper <- parseWrapper;
+                                      char '?';
+                                      pat <- parsePattern;
+                                      return $ wrapper $ \x -> Pattern x pat)
+
+              exp1 <- parseExpAtom
+              tails <- many parseTailItem
+
+              return $ foldl (flip (.)) id tails $ exp1 
 
 parseUnop :: Parser UnaryOp
 parseUnop = (do char '\''; return UNot)
@@ -301,6 +307,8 @@ parseBinop = (char '_'  >> return Concat)
          <|> (char '/'  >> return Div)
          <|> (char '#'  >> return Rem)
          <|> (char '\\' >> return Quot)
+
+parsePattern = undefined
 
 -- I don't remember where I use this
 parseLocation = error "parseLocation not implemented"
