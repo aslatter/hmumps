@@ -264,8 +264,8 @@ parseExp = do let parseExpAtom :: Parser Expression
 
 parseUnop :: Parser UnaryOp
 parseUnop = (do char '\''; return UNot)
-        <|> (do char '+'; return UPlus)
-        <|> (do char '-'; return UMinus)
+        <|> (do char '+';  return UPlus)
+        <|> (do char '-';  return UMinus)
 
 parseExpVn :: Parser Expression
 parseExpVn = do vn <- parseVn
