@@ -204,7 +204,7 @@ parseHa :: Parser Command
 parseHa = do stringOrPrefix1 "ha"
              (parseHang <|> parseHalt)
              
-
+--Not sufficiently left factored
 parseHang = do
   stringOrPrefix "ng"
   cond <- postCondition
