@@ -194,8 +194,11 @@ parseElse = do
   char ' '
   return Else
 
-parseFor = undefined
-parseGoto = undefined
+parseFor = do stringOrPrefix1 "for"
+              undefined
+
+parseGoto = do stringOrPrefix1 "goto"
+               undefined
 
 parseHa :: Parser Command
 parseHa = do stringOrPrefix1 "ha"
