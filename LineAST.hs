@@ -248,14 +248,13 @@ parseExp = do let parseExpAtom :: Parser Expression
                   parseWrapper = (do char '\''; return $ \f x -> ExpUnop UNot (f x)) <|> (return id)
 
                   parseTailItem :: Parser (Expression -> Expression)
-                  parseTailItem = (do wrapper <- parseWrapper;
-                                      binop <- parseBinop;
-                                      exp <- parseExpAtom;
-                                      return $ wrapper  $ \x -> ExpBinop binop x exp)
-                              <|> (do wrapper <- parseWrapper;
-                                      char '?';
-                                      pat <- parsePattern;
-                                      return $ wrapper $ \x -> Pattern x pat)
+                  parseTailItem = do wrapper <- parseWrapper;
+                                     ((do binop <- parseBinop;
+                                          exp <- parseExpAtom;
+                                          return $ wrapper  $ \x -> ExpBinop binop x exp)
+                                      <|>(do char '?';
+                                             pat <- parsePattern;
+                                             return $ wrapper $ \x -> Pattern x pat))
 
               exp1 <- parseExpAtom
               tails <- many parseTailItem
