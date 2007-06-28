@@ -214,16 +214,23 @@ parseHalt = do
   cond <- postCondition
   return $ Halt cond
 
-parseIf = undefined
+parseIf = do stringOrPrefix1 "if"
+             undefined
+
 parseKill = do 
   stringOrPrefix1 "kill"
   cond <- postCondition
   killers <- sepBy killarg (char ',')
   return $ Kill cond killers
                
-parseMerge = undefined
-parseNew = undefined
-parseSet = undefined
+parseMerge = do stringOrPrefix1 "merge"
+                undefined
+
+parseNew = do stringOrPrefix1 "new"
+              undefined
+
+parseSet = do stringOrPrefix1 "set"
+              undefined
 
 killarg = undefined
 
