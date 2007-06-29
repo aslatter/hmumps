@@ -4,4 +4,4 @@ import MValue
 import MArray
 import LineAST
 
-main = undefined
+main = print "We're working"

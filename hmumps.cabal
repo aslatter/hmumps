@@ -1,0 +1,12 @@
+Name:                hmumps
+Version:             1.0
+License:             GPL
+License-file:        LICENSE
+Author:              Antoine Latter
+Maintainer:          aslatter@gmail.com
+Build-Depends:       base, haskell98, regex-compat, parsec
+
+Executable:          hmumps
+Main-is:             Main.hs
+ghc-options:         -fglasgow-exts
+
