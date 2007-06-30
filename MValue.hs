@@ -13,7 +13,7 @@ data MValue = String String
             | Float  Float
  deriving (Show)
 
--- I think is is proper MUMPS equality.
+-- I think is proper MUMPS equality.
 -- I need to write some tests to be sure.
 -- The key thing to watch out for is that
 -- 1.0 <> "1.0", in fact 1.0 == "1".  That

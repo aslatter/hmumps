@@ -8,12 +8,23 @@ import Text.Regex
 
 import MValue
 
+-- Where we put this may change, but I'm going to just include the pre
+-- processing here so that we can know where we stand.  The fundamental
+-- assumptions that can go into the true parsing is that 
+-- 1. There are no comments
+-- 2. There are no trailing whitespaces
+-- 3. There are no newlines
+-- Leaving in stupid version until I can think of a good way to fuse the traversals.
+
+initLex :: String -> [String]
+initLex = map ((takeWhile (/=';')) . reverse . (dropWhile whitespace) . reverse ) . lines
+    where whitespace x = any (==x) [' ','\t','\r']
 
 -- AST data structures
 -- These structures are what MUMPS will look like AFTER parsing,
 -- but these structures do NOT describe the execution environment.
 --
--- EXCPETION: The MValue data type is both used as literals in
+-- EXCEPTION: The MValue data type is both used as literals in
 -- the AST structures, and in the run-time environment.
 --
 -- These data structures, taken together, should be trvially
@@ -148,8 +159,7 @@ parseCommands = do many spaces
 -- munch comments
 comment :: Parser String
 comment = do char ';'
-             -- How do I match everything?
-             undefined
+             many anyChar
 
 command :: Parser Command
 command = parseBreak
@@ -175,16 +185,18 @@ postCondition = do char ':'
                    return $ Just cond
       <|> return Nothing
 
--- Will not work for an end-of-line statement
+-- Should work for end-of-line do statements.  Need more tests though.
 parseDo :: Parser Command
 parseDo = do stringOrPrefix1 "do"
              cond <- postCondition
-             char ' '
-             args <- mlist (do loc <- parseLocation
-                               args <- arglist parseFunArg
-                               cond <- postCondition
-                               return (cond,loc,args))
-             return $ Do cond args
+             do char ' '
+                args <- mlist (do loc <- parseLocation
+                                  args <- arglist parseFunArg
+                                  cond <- postCondition
+                                  return (cond,loc,args))
+                return $ Do cond args
+              <|> do eof
+                     return $ Do cond []
 
 -- Will not work for an end-of-line do statment
 parseElse = do
