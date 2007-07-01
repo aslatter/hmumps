@@ -15,8 +15,8 @@ mIndex :: Monad m => MArray -> [MValue] -> m MValue
 mIndex (MArray v _map) []     = case v of
                                   Nothing -> fail "mIndex: value not set at specified index"
                                   Just mv -> return mv
-mIndex (MArray v  map)  (x:xs) = do vc <- lookup x map
-                                    mIndex vc xs
+mIndex (MArray _ map)  (x:xs) = do vc <- lookup x map
+                                   mIndex vc xs
 
 -- Takes an array, subscripts and a value and returns the
 -- updated array.
@@ -41,6 +41,7 @@ nextArray v (MArray _v map) = case lookup v map of
 -- Returns the next highest subscript for the last
 -- subscript provided.  Passing false for the bool
 -- gives the next lowest, instead.
+-- Likely doesn't work yet
 order :: Monad m => MArray -> Bool -> [MValue] -> m MValue
 order (MArray _ map) forward (mv:[]) = let (map1, map2) = split mv map in
   if forward
@@ -50,4 +51,3 @@ order (MArray _ map) forward (mv:[]) = let (map1, map2) = split mv map in
           else let (k,_) = findMax map1 in return k
 order (MArray _ map) forward (mv:ms) = do vc <- lookup mv map
                                           order vc forward ms
-

@@ -192,8 +192,8 @@ parseDo = do stringOrPrefix1 "do"
              do char ' '
                 args <- mlist (do loc <- parseLocation
                                   args <- arglist parseFunArg
-                                  cond <- postCondition
-                                  return (cond,loc,args))
+                                  cond' <- postCondition
+                                  return (cond',loc,args))
                 return $ Do cond args
               <|> do eof
                      return $ Do cond []
@@ -204,7 +204,6 @@ parseDo = do stringOrPrefix1 "do"
 parseElse :: Parser Command
 parseElse = do
   stringOrPrefix1 "else"
-  cond <- postCondition
   char ' '
   char ' '
   return Else
@@ -227,8 +226,8 @@ parseHang = do
   stringOrPrefix "ng"
   cond <- postCondition
   char ' '
-  exp <- parseExp
-  return $ Hang cond exp
+  expr <- parseExp
+  return $ Hang cond expr
 
 parseHalt :: Parser Command
 parseHalt = do

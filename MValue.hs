@@ -32,8 +32,8 @@ instance Eq MValue where
           meq (Number n)  (Float f) = f == (fromInteger n)
           meq (Float f)   (Number n) = f == (fromInteger n)
           -- Last, conversion to strings
-          meq ms@(String s) mv = ms == mString mv
-          meq mv ms@(String s) = ms == mString mv
+          meq ms@(String _) mv = ms == mString mv
+          meq mv ms@(String _) = ms == mString mv
 
 -- This instance of Ord gives proper sorting in an
 -- MArray, but does NOT give proper results for the
@@ -56,8 +56,8 @@ instance Ord MValue where
 -- I'm not sure about how I handle floats.
 mString :: MValue -> MValue
 mString (Number n)   = String $ show n
-mString (Float f)    = String $ if f == (fromIntegral . truncate) f
-                                then (show . truncate) f
+mString (Float f)    = String $ if f == fromIntegral (truncate f :: Integer)
+                                then show (truncate f :: Integer)
                                 else show f
 mString x@(String _) = x
 
@@ -70,11 +70,12 @@ mNum (String ('-':s)) = case mNum (String s) of
                           Number 0 -> Number 0
                           Number n -> Number (- n)
                           Float  n -> Float  (- n)
+                          String _ -> error "mNum should not produce an MValue contructed with \"String\""
 mNum (String s) = if isSpace (head s) then Number 0 else
   case (reads s :: [(Integer,String)]) of
-    (i,s):[] -> Number i
+    (i,_):[] -> Number i
     _        -> case (reads s :: [(Float,String)]) of
-                  (f,s):[] -> Float f
+                  (f,_):[] -> Float f
                   _        -> Number 0
 mNum x@(_) = x
 
