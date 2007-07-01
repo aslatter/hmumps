@@ -198,7 +198,10 @@ parseDo = do stringOrPrefix1 "do"
               <|> do eof
                      return $ Do cond []
 
+
+
 -- Will not work for an end-of-line do statment
+parseElse :: Parser Command
 parseElse = do
   stringOrPrefix1 "else"
   cond <- postCondition
@@ -206,9 +209,11 @@ parseElse = do
   char ' '
   return Else
 
+parseFor :: Parser Command
 parseFor = do stringOrPrefix1 "for"
               undefined
 
+parseGoto :: Parser Command
 parseGoto = do stringOrPrefix1 "goto"
                undefined
 
@@ -217,6 +222,7 @@ parseHa = do stringOrPrefix1 "ha"
              (parseHang <|> parseHalt)
              
 --Not sufficiently left factored
+parseHang :: Parser Command
 parseHang = do
   stringOrPrefix "ng"
   cond <- postCondition
@@ -224,29 +230,36 @@ parseHang = do
   exp <- parseExp
   return $ Hang cond exp
 
+parseHalt :: Parser Command
 parseHalt = do
   stringOrPrefix "lt"
   cond <- postCondition
   return $ Halt cond
 
+parseIf :: Parser Command
 parseIf = do stringOrPrefix1 "if"
              undefined
 
+parseKill :: Parser Command
 parseKill = do 
   stringOrPrefix1 "kill"
   cond <- postCondition
   killers <- sepBy killarg (char ',')
   return $ Kill cond killers
-               
+
+parseMerge :: Parser Command               
 parseMerge = do stringOrPrefix1 "merge"
                 undefined
 
+parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
               undefined
 
+parseSet :: Parser Command
 parseSet = do stringOrPrefix1 "set"
               undefined
 
+killarg :: Parser KillArg
 killarg = undefined
 
 stringOrPrefix :: String -> Parser String
@@ -292,6 +305,7 @@ parseExpVn :: Parser Expression
 parseExpVn = do vn <- parseVn
                 return $ ExpVn vn
 
+parseExpFuncall :: Parser Expression
 parseExpFuncall = do char '$'
                      error "parseExpFuncall undefined"
 
@@ -313,12 +327,14 @@ parseNumLit = do xs <- many1 digit
                   <|> (return . ExpLit. Number .read) xs
 
 -- Does not work for quote-marks inside a string
+parseStringLit :: Parser Expression
 parseStringLit = do char '"'
                     xs <- many (noneOf "\"")
                     char '"'
                     (return . ExpLit . String) xs
 
 -- No guarantees that the list of binops is complete.
+parseBinop :: Parser BinOp
 parseBinop = (char '_'  >> return Concat)
          <|> (char '+'  >> return Add)
          <|> (char '-'  >> return Sub)
@@ -327,9 +343,11 @@ parseBinop = (char '_'  >> return Concat)
          <|> (char '#'  >> return Rem)
          <|> (char '\\' >> return Quot)
 
+parsePattern :: Parser Regex
 parsePattern = undefined
 
 -- I don't remember where I use this
+parseLocation :: Parser Location
 parseLocation = error "parseLocation not implemented"
 
 -- Differs from parseExp because a funarg may be either:
