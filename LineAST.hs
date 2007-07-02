@@ -45,7 +45,9 @@ initLex = map ((takeWhile (/=';')) . reverse . (dropWhile whitespace) . reverse 
 data Command = Break (Maybe Condition)
              | Do (Maybe Condition) [(Maybe Condition,Location,[FunArg])]
              | Else
-             | For (Maybe (Vn, ForArg)) -- note lack of postcondition
+             | For1 Vn Expression
+             | For2 Vn Expression Expression
+             | ForEach Vn [Expression]
              | Goto (Maybe Condition) [(Maybe Condition,Location)]
              | Halt (Maybe Condition)
              | Hang (Maybe Condition) Expression
@@ -72,12 +74,6 @@ data Routineref = Routineref (Maybe String) String
 
 type Condition = Expression
 type Subscript = Expression
-
--- See 8.2.5
-data ForArg = For1 Expression
-            | For2 Expression Expression
-            | For3 Expression Expression Expression
- deriving Show
 
 -- See 8.2.11
 data KillArg = KillSelective Vn
