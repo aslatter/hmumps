@@ -1,4 +1,34 @@
-module LineAST where
+-- |This module contains everything needed to do the initial parsing
+-- of either a MUMPS routine or MUMPS commands entered at a REPL
+module LineAST (
+                -- * Syntax-Tree Types
+                -- ** Commands
+                Command(..),
+                Location(..),
+                FunArg(..),
+                Vn(..),
+                DLabel(..),
+                Routineref(..),
+                KillArg(..),
+                MergeArg,
+                NewArg(..),
+                SetArg,
+                Name(..),
+                -- ** Expressions
+                Expression(..),
+                Condition,
+                Subscript,
+                UnaryOp(..),
+                BinOp(..),
+                -- * Parsering related functionality
+                initLex,
+                comment,
+                parseCommands,
+                command,
+                parseExp,
+                mlist,
+                mlist1
+               ) where
 
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com
@@ -16,6 +46,11 @@ import MValue
 -- 3. There are no newlines
 -- Leaving in stupid version until I can think of a good way to fuse the traversals.
 
+-- | The "initLex" function takes in a string representing all of the code
+-- to be parsed (say, an entire routine) and:
+--  * Breaks the code into lines
+--  * Removes comments
+--  * Removes trailing whitespace
 initLex :: String -> [String]
 initLex = map ((takeWhile (/=';')) . reverse . (dropWhile whitespace) . reverse ) . lines
     where whitespace x = any (==x) [' ','\t','\r']
@@ -38,13 +73,14 @@ initLex = map ((takeWhile (/=';')) . reverse . (dropWhile whitespace) . reverse 
 
 -- I feel like this is going to turn into an explosion of type contructors
 --
--- These commands make up the initial sub-set of commands I'd like
+-- | These commands make up the initial sub-set of commands I'd like
 -- to implement.  I'm not sure if the ASTs described here will make
 -- up the optimizable representation, but they will make up what's
 -- executed by my first stab at a run-time environment.
 data Command = Break (Maybe Condition)
              | Do (Maybe Condition) [(Maybe Condition,Location,[FunArg])]
              | Else
+             | For
              | For1 Vn Expression
              | For2 Vn Expression Expression
              | ForEach Vn [Expression]
@@ -58,72 +94,106 @@ data Command = Break (Maybe Condition)
              | Set (Maybe Condition) [SetArg]
  deriving Show
 
--- Location stuff used by Do, Goto &c. Section 8.1.6.1
+--TODO: Add DoArg and GotoArg datatypes, so they may be indirect
+
+-- | "Location" is a thing that can be pointed to by a DO or a GOTO,
+-- it may be specify a subroutine or a routine. This datatype should
+-- be equivalent to the "entryref" of the MUMPS spec.
 data Location = Routine Routineref
               | Subroutine DLabel (Maybe Integer) Routineref
  deriving Show
 
+-- | The DLabel is tag pointed to by a location, if the location
+-- specifies a label.
 data DLabel = DLabel String 
             | DLabelIndirect Expression
  deriving Show
 
+-- | The Routineref specifies a routine and an optional
+-- environment.  May be indirect.
 data Routineref = Routineref (Maybe String) String
                 | RoutinerefIndirect Expression
  deriving Show
 
-
 type Condition = Expression
 type Subscript = Expression
 
+-- | Each argument to KILL may be
+--  * A variable name
+--  * A list containing the names of variables
+--    not to kill (the remainder are killed)
+--  * An expression, evaluating to a list of 
+--    valid kill arguments
 -- See 8.2.11
 data KillArg = KillSelective Vn
              | KillExclusive [Name]
              | KillIndirect  Expression
  deriving Show
 
+-- |An argument to merge specifies a source and a target.
 -- See 8.2.13
 type MergeArg = (Vn,Vn)
 
 
--- See 8.2.14
 -- New should probably be broken up into more primative commands
 -- such as PushNewframe and AddNewframeEntry or something,
 -- for optimization.  I'll new to have designed the run-time
 -- environment first.
+-- | The arguments to NEW are pretty much the same as the arguments
+-- to KILL.
+-- See 8.2.14
 data NewArg = NewSelective Name
             | NewExclusive [Name]
             | NewIndirect  Expression
  deriving Show
 
--- Variable names: 7.1.2
+-- |Vn describes the name of a variable, which may be local, global,
+-- or indirect.  Each form may optionally indicate a Subscript.
+-- See 7.1.2
 data Vn = Lvn Name [Subscript] -- these two will only ever
         | Gvn Name [Subscript] -- be direct names.  Maybe.
         | IndirectVn Expression [Subscript]
  deriving Show
 
--- A funarg can be an expression, or the name of a local to pass
--- in by reference (I think this is what I meant?)
+-- | A funarg can be an expression, or the name of a local to pass
+-- in by reference.
 data FunArg = FunArgExp Expression
             | FunArgName Name
  deriving Show
 
--- Titles of routines, tags and variables.
--- Name is what appears in the symbol table or
--- whatever, LName is an expression which must
--- evaluate to a Name.
-data Name = Name String | LName Expression
+-- |A Name is the title of a routine, tag or variable.
+data Name
+    -- | This is the string which would appear in the symbol
+    -- table.
+    = Name String
+    -- |An LName is the indirect form of a name, and should
+    -- evaluate to a valid Name.
+    | LName Expression
  deriving Show
 
 
 -- there's somehting I'm not groking wrt the standard and expressions.
 -- The "Expression" type will ikely be the last thing I define.
-data Expression = ExpLit MValue 
-                | ExpVn Vn
-                | ExpUnop UnaryOp Expression
-                | ExpBinop BinOp Expression Expression
-                | BIFCall String [Expression]
-                | Funcal  String (Maybe String) [Expression]
-                | Pattern Expression Regex
+-- | An expression is something which evaluates to an MValue.
+data Expression
+    -- |An expression may be a literal MValue
+    = ExpLit MValue
+    -- |or a variable to be fetched
+    | ExpVn Vn
+    -- |Any expression may be precedded by one of the
+    -- unary operators
+    | ExpUnop UnaryOp Expression
+    -- |Binary operators may be used to combine expressions.
+    | ExpBinop BinOp Expression Expression
+    -- |MUMPS provides many builtin functions, some of which
+    -- are of arity zero (so are more like builtin constants)
+    | BIFCall String [Expression]
+    -- |You can even call your own functions!  Locally defined
+    -- functions need not specify the parent routine.
+    | Funcal  String (Maybe String) [Expression]
+    -- |A pattern match is similar to a regular expression match.
+    -- This binary operator returns either 0 or 1.
+    | Pattern Expression Regex
  deriving Show
 
 instance Show Regex where
@@ -139,9 +209,12 @@ data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
 -- I don't know why I hadn't defined this earlier.
 -- I'm glad I hadn't - it liekly would've been
 -- more complicated.
+-- |A set argument consists of list of variable names that are to be
+-- set to the supplied expression.  Even though the SetArg as a whole
+-- may not be indirect, the Vn or Expression may allow for indirection.
 type SetArg=([Vn],Expression)
 
--- Parse Commands is fed a LINE of MUMPS (after line-level is determined)
+-- |Parse Commands is fed a LINE of MUMPS (after line-level has been detrimined).
 parseCommands :: Parser [Command]
 parseCommands = do many spaces
                    (do x <- command;
@@ -157,6 +230,7 @@ comment :: Parser String
 comment = do char ';'
              many anyChar
 
+-- |Parses a single command.
 command :: Parser Command
 command = parseBreak
       <|> parseDo
@@ -266,7 +340,7 @@ stringOrPrefix1 (x:xs) = do y <- char x
                             ys <- stringOrPrefix xs
                             return (y:ys)
 
--- Parse an expression.  Is not at all forgiving about extraneous whitespace.
+-- |Parse an expression.  Is not at all forgiving about extraneous whitespace.
 parseExp :: Parser Expression
 parseExp = do let parseExpAtom :: Parser Expression
                   parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
@@ -375,15 +449,12 @@ litName = do x <- oneOf (return '%' ++ ident)
        digits = ['0'..'9']
                          
 
-
-             
-
--- Given a parser, parse a comma separated list of these.
+-- |Given a parser, parse a comma separated list of these.
 mlist :: Parser a -> Parser [a]
 mlist pa = mlist1 pa <|> return []
 
 
--- Similar to mlist, but must grab at least one element
+-- |Similar to mlist, but must grab at least one element
 mlist1 :: Parser a -> Parser [a]
 mlist1 pa = do 
               x <- pa
