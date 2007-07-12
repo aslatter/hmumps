@@ -87,7 +87,7 @@ mNum (String s) = if isSpace (head s) then Number 0 else
     _        -> case (reads s :: [(Double,String)]) of
                   (f,_):[] -> Float f
                   _        -> Number 0
-mNum x@(_) = x
+mNum x = x
 
 -- |Tests to see if an MValue is a number.
 -- Note that a String constructed MValue can pass this test.
