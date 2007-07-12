@@ -1,3 +1,4 @@
+-- |This module defines the basic MUMPS type: the MValue
 module MValue where
 
 -- Copyright 2007 Antoine Latter
@@ -8,13 +9,17 @@ import Char
 -- The MUMPS value type - is transparently a string or int
 -- or float.
 
+-- |Implementation-wise, the MValue is a wrapper around three
+-- different Haskell types: a String, an Integer, or a Double.
+-- However the integer and double representation are purely
+-- for convinience, as far as the standard is concerned the number
+-- type is a strict subtype of the string type.
 data MValue = String String
             | Number Integer
             | Float  Float
  deriving (Show)
 
--- I think is proper MUMPS equality.
--- I need to write some tests to be sure.
+-- |I think this is proper MUMPS equality.
 -- The key thing to watch out for is that
 -- 1.0 <> "1.0", in fact 1.0 == "1".  That
 -- is, numeric literals should be striped down
@@ -35,9 +40,9 @@ instance Eq MValue where
           meq ms@(String _) mv = ms == mString mv
           meq mv ms@(String _) = ms == mString mv
 
--- This instance of Ord gives proper sorting in an
+-- |This instance of Ord gives proper sorting in an
 -- MArray, but does NOT give proper results for the
--- MUMPS gt an lt operators.
+-- MUMPS ">" an "<" operators.
 instance Ord MValue where
     compare (Number i1) (Number i2) = compare i1 i2
     compare (Float  f1) (Float  f2) = compare f1 f2
@@ -52,8 +57,8 @@ instance Ord MValue where
     compare mv (String s2) = let (String s1) = mString mv in compare s1 s2
 
 
--- Cast to String
--- I'm not sure about how I handle floats.
+-- |Cast to String - the returned MValue is always built witht the String
+-- constructor.
 mString :: MValue -> MValue
 mString (Number n)   = String $ show n
 mString (Float f)    = String $ if f == fromIntegral (truncate f :: Integer)
@@ -62,7 +67,12 @@ mString (Float f)    = String $ if f == fromIntegral (truncate f :: Integer)
 mString x@(String _) = x
 
 
--- Cast to Number|Float
+-- |Cast to number.  Leading + or - signs are interpretted as unary
+-- operators.  The supplied MValue is scanned from left to right until
+-- characters that can't be interpretted in a numeric context are found.
+-- The resulting number is returned as an MValue.  If the supplied MValue's
+-- leading charecters cannot be interpretted in a numeric context, zero is
+-- returned.
 mNum :: MValue -> MValue
 mNum (String [])  = Number 0
 mNum (String ('+':s)) = mNum $ String s
@@ -79,8 +89,8 @@ mNum (String s) = if isSpace (head s) then Number 0 else
                   _        -> Number 0
 mNum x@(_) = x
 
--- Tests to see if an MValue is a number.
--- Note that a String can pass this test.
+-- |Tests to see if an MValue is a number.
+-- Note that a String constructed MValue can pass this test.
 isNum :: MValue -> Bool
 isNum (Number _) = True
 isNum (Float  _) = True

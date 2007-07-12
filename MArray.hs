@@ -1,4 +1,10 @@
-module MArray where
+module MArray (
+               MArray,
+               mEmpty,
+               mIndex,
+               arrayUpdate,
+               order
+              ) where
 
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com
@@ -9,7 +15,12 @@ import Prelude hiding (lookup,null)
 
 data MArray = MArray (Maybe MValue) (Map MValue MArray)
 
--- Given an MArray and a list of subscripts, maybe
+-- |Returns an empty MArray
+mEmpty :: MArray
+mEmpty = MArray Nothing empty
+
+
+-- |Given an MArray and a list of subscripts, maybe
 -- return the value associated with those subs.
 mIndex :: Monad m => MArray -> [MValue] -> m MValue
 mIndex (MArray v _map) []     = case v of
@@ -18,7 +29,7 @@ mIndex (MArray v _map) []     = case v of
 mIndex (MArray _ map)  (x:xs) = do vc <- lookup x map
                                    mIndex vc xs
 
--- Takes an array, subscripts and a value and returns the
+-- |Takes an array, subscripts and a value and returns the
 -- updated array.
 arrayUpdate :: MArray -> [MValue] -> MValue -> MArray
 arrayUpdate (MArray  v map) [] v' =  MArray (Just v') map
@@ -38,11 +49,15 @@ nextArray v (MArray _v map) = case lookup v map of
     Just ma' -> ma'
 
 
--- Returns the next highest subscript for the last
+-- |Returns the next highest subscript for the last
 -- subscript provided.  Passing false for the bool
 -- gives the next lowest, instead.
--- Likely doesn't work yet
-order :: Monad m => MArray -> Bool -> [MValue] -> m MValue
+-- I'll be re-writing this soon (I hope!), including
+-- the type-sugnature.
+order :: Monad m => MArray -- ^The supplied array
+      -> Bool -- ^Set to False to search backwards
+      -> [MValue] -- ^The supplied subscript
+      -> m MValue -- ^The next value for the last subscript provided
 order (MArray _ map) forward (mv:[]) = let (map1, map2) = split mv map in
   if forward
      then if null map2 then fail "Order: no higher indices"
