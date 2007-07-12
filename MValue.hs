@@ -16,7 +16,7 @@ import Char
 -- type is a strict subtype of the string type.
 data MValue = String String
             | Number Integer
-            | Float  Float
+            | Float  Double
  deriving (Show)
 
 -- |I think this is proper MUMPS equality.
@@ -84,7 +84,7 @@ mNum (String ('-':s)) = case mNum (String s) of
 mNum (String s) = if isSpace (head s) then Number 0 else
   case (reads s :: [(Integer,String)]) of
     (i,_):[] -> Number i
-    _        -> case (reads s :: [(Float,String)]) of
+    _        -> case (reads s :: [(Double,String)]) of
                   (f,_):[] -> Float f
                   _        -> Number 0
 mNum x@(_) = x
