@@ -6,9 +6,6 @@ import Control.Monad
 import Text.ParserCombinators.Parsec
 import System.IO
 
--- I want this to be a REPL, where the user is given a prompt.
--- But this doesnt do that ... it prints the prompt after taking
--- input.  I don't know why
 
 main :: IO ()
 main = disclaimer >> (loop $ do putStr "> "
