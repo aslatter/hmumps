@@ -256,7 +256,7 @@ command = parseBreak
       <|> parseNew
       <|> parseRead
       <|> parseSet
-      <|> parseWrite
+      <|> parseWrite <?> "MUMPS command"
 
 parseBreak :: Parser Command
 parseBreak = do stringOrPrefix1 "break"

@@ -1,0 +1,7 @@
+LineAST:
+	replace the "Location" datastructure with an
+	"EntryRef" datastructure, which subsumes the
+	MUMPS "entryref" and "labelref"
+
+	run the Main executable, and try to enter valid comands.
+	fix was doesn't work :)
