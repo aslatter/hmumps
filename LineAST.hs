@@ -92,7 +92,9 @@ data Command = Break (Maybe Condition)
              | Kill (Maybe Condition) [KillArg]
              | Merge (Maybe Condition) [MergeArg]
              | New (Maybe Condition) [NewArg]
+             | Read (Maybe Condition) [WriteArg] Vn
              | Set (Maybe Condition) [SetArg]
+             | Write (Maybe Condition) [WriteArg]
  deriving Show
 
 --TODO: Add DoArg and GotoArg datatypes, so they may be indirect
@@ -147,6 +149,8 @@ data NewArg = NewSelective Name
             | NewExclusive [Name]
             | NewIndirect  Expression
  deriving Show
+
+type WriteArg = ()
 
 -- |Vn describes the name of a variable, which may be local, global,
 -- or indirect.  Each form may optionally indicate a Subscript.
@@ -243,7 +247,9 @@ command = parseBreak
       <|> parseKill
       <|> parseMerge
       <|> parseNew
+      <|> parseRead
       <|> parseSet
+      <|> parseWrite
 
 parseBreak :: Parser Command
 parseBreak = do stringOrPrefix1 "break"
@@ -281,11 +287,11 @@ parseElse = do
 
 parseFor :: Parser Command
 parseFor = do stringOrPrefix1 "for"
-              undefined
+              error "No parser for FOR"
 
 parseGoto :: Parser Command
 parseGoto = do stringOrPrefix1 "goto"
-               undefined
+               error "No parser for GOTO"
 
 parseHa :: Parser Command
 parseHa = do stringOrPrefix1 "ha"
@@ -308,7 +314,7 @@ parseHalt = do
 
 parseIf :: Parser Command
 parseIf = do stringOrPrefix1 "if"
-             undefined
+             error "No parser for IF"
 
 parseKill :: Parser Command
 parseKill = do 
@@ -319,18 +325,26 @@ parseKill = do
 
 parseMerge :: Parser Command               
 parseMerge = do stringOrPrefix1 "merge"
-                undefined
+                error "No parser for MERGE"
 
 parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
-              undefined
+              error "No parser for NEW"
+
+parseRead :: Parser Command
+parseRead = do stringOrPrefix1 "read"
+               error "No parser for READ"
 
 parseSet :: Parser Command
 parseSet = do stringOrPrefix1 "set"
-              undefined
+              error "No parser for SET"
+
+parseWrite :: Parser Command
+parseWrite = do stringOrPrefix1 "write"
+                error "No parser for WRITE"
 
 killarg :: Parser KillArg
-killarg = undefined
+killarg = error "No KillArg parser"
 
 stringOrPrefix :: String -> Parser String
 stringOrPrefix str = stringOrPrefix1 str <|> return []
@@ -414,7 +428,7 @@ parseBinop = (char '_'  >> return Concat)
          <|> (char '\\' >> return Quot)
 
 parsePattern :: Parser Regex
-parsePattern = undefined
+parsePattern = error "No pattern parser"
 
 -- I don't remember where I use this
 parseLocation :: Parser Location
