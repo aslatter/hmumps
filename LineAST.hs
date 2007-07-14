@@ -344,8 +344,10 @@ parseKill :: Parser Command
 parseKill = do 
   stringOrPrefix1 "kill"
   cond <- postCondition
-  killers <- sepBy killarg (char ',')
-  return $ Kill cond killers
+  (do char ' '
+      args <- mlist parseKillArg
+      return $ Kill cond args)
+   <|> (eof >> (return $ Kill cond []))
 
 parseMerge :: Parser Command               
 parseMerge = do stringOrPrefix1 "merge"
@@ -367,8 +369,10 @@ parseWrite :: Parser Command
 parseWrite = do stringOrPrefix1 "write"
                 error "No parser for WRITE"
 
-killarg :: Parser KillArg
-killarg = error "No KillArg parser"
+parseKillArg :: Parser KillArg
+parseKillArg = (KillIndirect `liftM` (char '@' >> parseExp))
+           <|> (KillExclusive `liftM` arglist1 litName)
+           <|> (KillSelective `liftM` parseVn)
 
 stringOrPrefix :: String -> Parser String
 stringOrPrefix str = stringOrPrefix1 str <|> return []
@@ -519,3 +523,11 @@ arglist pa = do char '('
                 char ')'
                 return xs
          <|> return []
+
+-- Given a parser, parse a comma separated non-empty list of these
+-- surounded by parens
+arglist1 :: Parser a -> Parser [a]
+arglist1 pa = do char '('
+                 xs <- mlist1 pa
+                 char ')'
+                 return xs
