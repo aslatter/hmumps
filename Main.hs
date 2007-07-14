@@ -4,6 +4,7 @@ import LineAST
 
 import Control.Monad
 import Text.ParserCombinators.Parsec
+import System.IO
 
 -- I want this to be a REPL, where the user is given a prompt.
 -- But this doesnt do that ... it prints the prompt after taking
@@ -11,6 +12,7 @@ import Text.ParserCombinators.Parsec
 
 main :: IO ()
 main = disclaimer >> (loop $ do putStr "> "
+                                hFlush stdout
                                 x <- getLine
                                 putStrLn $ repl x)
 
