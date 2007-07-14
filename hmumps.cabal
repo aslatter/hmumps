@@ -8,5 +8,5 @@ Build-Depends:       base, haskell98, regex-compat, parsec
 
 Executable:          hmumps
 Main-is:             Main.hs
-ghc-options:         -fglasgow-exts
+ghc-options:         
 
