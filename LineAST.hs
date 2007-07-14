@@ -79,13 +79,13 @@ initLex = map ((takeWhile (/=';')) . reverse . (dropWhile whitespace) . reverse 
 -- up the optimizable representation, but they will make up what's
 -- executed by my first stab at a run-time environment.
 data Command = Break (Maybe Condition)
-             | Do (Maybe Condition) [(Maybe Condition,Location,[FunArg])]
+             | Do (Maybe Condition) [DoArg]
              | Else
              | For
              | For1 Vn Expression
              | For2 Vn Expression Expression
              | ForEach Vn [Expression]
-             | Goto (Maybe Condition) [(Maybe Condition,Location)]
+             | Goto (Maybe Condition) [GotoArg]
              | Halt (Maybe Condition)
              | Hang (Maybe Condition) Expression
              | If [Condition]
@@ -97,7 +97,14 @@ data Command = Break (Maybe Condition)
              | Write (Maybe Condition) [WriteArg]
  deriving Show
 
---TODO: Add DoArg and GotoArg datatypes, so they may be indirect
+
+data DoArg = DoArg (Maybe Condition) Location [FunArg]
+           | DoArgIndirect Expression
+ deriving Show
+
+data GotoArg = GotoArg (Maybe Condition) Location
+             | GotoArgIndirect Expression
+ deriving Show
 
 -- | "Location" is a thing that can be pointed to by a DO or a GOTO,
 -- it may be specify a subroutine or a routine. This datatype should
@@ -267,15 +274,34 @@ parseDo :: Parser Command
 parseDo = do stringOrPrefix1 "do"
              cond <- postCondition
              do char ' '
-                args <- mlist (do loc <- parseLocation
-                                  args <- arglist parseFunArg
-                                  cond' <- postCondition
-                                  return (cond',loc,args))
+                args <- mlist parseDoArg
                 return $ Do cond args
               <|> do eof
                      return $ Do cond []
 
+parseDoArg :: Parser DoArg
+parseDoArg = (do char '@'; exp <- parseExp; return $ DoArgIndirect exp)
+         <|> (do loc <- parseLocation
+                 args <- arglist parseFunArg
+                 cond <- postCondition
+                 return $ DoArg cond loc args)
 
+-- very similar to the DO parser - which makes sense, as they do
+-- similar things.
+parseGoto :: Parser Command
+parseGoto = do stringOrPrefix1 "goto"
+               cond <- postCondition
+               do char ' '
+                  args <- mlist parseGotoArg
+                  return $ Goto cond args
+                <|> do eof
+                       return $ Goto cond []
+
+parseGotoArg :: Parser GotoArg
+parseGotoArg = (do char '@'; exp <- parseExp; return $ GotoArgIndirect exp)
+           <|> (do loc <- parseLocation
+                   cond <- postCondition
+                   return $ GotoArg cond loc)
 
 -- Will not work for an end-of-line do statment
 parseElse :: Parser Command
@@ -289,9 +315,6 @@ parseFor :: Parser Command
 parseFor = do stringOrPrefix1 "for"
               error "No parser for FOR"
 
-parseGoto :: Parser Command
-parseGoto = do stringOrPrefix1 "goto"
-               error "No parser for GOTO"
 
 parseHa :: Parser Command
 parseHa = do stringOrPrefix1 "ha"
@@ -450,16 +473,16 @@ parseVn = (do char '@'
       <|> (do char '^'
               name <- litName
               args <- arglist parseExp
-              return $ Gvn (Name name) args)
+              return $ Gvn name args)
       <|> (do name <- litName
               args <- arglist parseExp
-              return $ Lvn (Name name) args)
+              return $ Lvn name args)
 
 -- Parses a literal name.
-litName :: Parser String
+litName :: Parser Name
 litName = do x <- oneOf (return '%' ++ ident)
              xs <- many (oneOf (ident ++ digits))
-             return $ x:xs
+             return . Name $ x:xs
  where ident = ['a'..'z'] ++ ['A'..'Z']
        digits = ['0'..'9']
                          
