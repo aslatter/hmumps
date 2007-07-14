@@ -4,10 +4,10 @@ module LineAST (
                 -- * Syntax-Tree Types
                 -- ** Commands
                 Command(..),
-                Location(..),
+                EntryRef(..),
                 FunArg(..),
                 Vn(..),
-                DLabel(..),
+                Label(..),
                 Routineref(..),
                 KillArg(..),
                 MergeArg,
@@ -33,7 +33,7 @@ module LineAST (
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com
 
-
+import Control.Monad
 import Text.ParserCombinators.Parsec
 import Text.Regex
 
@@ -98,30 +98,31 @@ data Command = Break (Maybe Condition)
  deriving Show
 
 
-data DoArg = DoArg (Maybe Condition) Location [FunArg]
+data DoArg = DoArg (Maybe Condition) EntryRef [FunArg]
            | DoArgIndirect Expression
  deriving Show
 
-data GotoArg = GotoArg (Maybe Condition) Location
+data GotoArg = GotoArg (Maybe Condition) EntryRef
              | GotoArgIndirect Expression
  deriving Show
 
--- | "Location" is a thing that can be pointed to by a DO or a GOTO,
+-- | "EntryRef" is a thing that can be pointed to by a DO or a GOTO,
 -- it may be specify a subroutine or a routine. This datatype should
 -- be equivalent to the "entryref" of the MUMPS spec.
-data Location = Routine Routineref
-              | Subroutine DLabel (Maybe Integer) Routineref
+data EntryRef = Routine Routineref
+              | Subroutine Label (Maybe Integer) Routineref
  deriving Show
 
--- | The DLabel is tag pointed to by a location, if the location
+-- | The DLabel is tag pointed to by an enytryref, if the entryref
 -- specifies a label.
-data DLabel = DLabel String 
-            | DLabelIndirect Expression
+data Label = Label Name
+            | LabelInt Integer -- ^Labels can be given as integers
+            | LabelIndirect Expression
  deriving Show
 
 -- | The Routineref specifies a routine and an optional
 -- environment.  May be indirect.
-data Routineref = Routineref (Maybe String) String
+data Routineref = Routineref Name
                 | RoutinerefIndirect Expression
  deriving Show
 
@@ -281,7 +282,7 @@ parseDo = do stringOrPrefix1 "do"
 
 parseDoArg :: Parser DoArg
 parseDoArg = (do char '@'; exp <- parseExp; return $ DoArgIndirect exp)
-         <|> (do loc <- parseLocation
+         <|> (do loc <- parseEntryRef
                  args <- arglist parseFunArg
                  cond <- postCondition
                  return $ DoArg cond loc args)
@@ -299,7 +300,7 @@ parseGoto = do stringOrPrefix1 "goto"
 
 parseGotoArg :: Parser GotoArg
 parseGotoArg = (do char '@'; exp <- parseExp; return $ GotoArgIndirect exp)
-           <|> (do loc <- parseLocation
+           <|> (do loc <- parseEntryRef
                    cond <- postCondition
                    return $ GotoArg cond loc)
 
@@ -449,13 +450,24 @@ parseBinop = (char '_'  >> return Concat)
          <|> (char '/'  >> return Div)
          <|> (char '#'  >> return Rem)
          <|> (char '\\' >> return Quot)
+         <?> "binary operator"
 
 parsePattern :: Parser Regex
 parsePattern = error "No pattern parser"
 
--- I don't remember where I use this
-parseLocation :: Parser Location
-parseLocation = error "parseLocation not implemented"
+-- Used in DoArg and GotoArg
+parseEntryRef :: Parser EntryRef
+parseEntryRef = (do char '^'
+                    (do char '@'
+                        (Routine . RoutinerefIndirect) `liftM` parseExp)
+                    <|> (Routine . Routineref) `liftM` litName)
+                   
+                      
+                   
+
+parseOrIndirect :: Parser a -> Parser (Either Expression a)
+parseOrIndirect p = (char '@' >> Left `liftM` parseExp)
+                <|> (Right `liftM` p)
 
 -- Differs from parseExp because a funarg may be either:
 --  * An Expression
