@@ -8,12 +8,17 @@ LineAST:
 	> type Name = String
 	(along with everything that uses the constructor)
 
-	parseLocation doesn't work proper.
-	into Main, entering
-	> g somewhere
-	the text "somewhere" will be interpreted as the name of
-	a routine, when it should be the name of a label.
-
 	entering
 	> h:cond
 	seems to be broken
+
+	> g label+12^place
+	parses as expected, however theres a problem of left-facotrin
+	the arguments to a GOTO (and likely a DO):
+	a GotoArg as a whole is allowed to be indirect:
+	> g @arg1,@arg2
+	and a Label is allowed to be indirect:
+	> g @lanel^routine
+	should work.  currently, the '@' is seen as an
+	indication that the whole GotoArg is indirect, when
+	in fact it's just the label.

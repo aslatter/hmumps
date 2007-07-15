@@ -30,7 +30,9 @@ module LineAST (
                 command,
                 parseExp,
                 mlist,
-                mlist1
+                mlist1,
+                arglist,
+                arglist1
                ) where
 
 -- Copyright 2007 Antoine Latter
@@ -113,7 +115,7 @@ data GotoArg = GotoArg (Maybe Condition) EntryRef
 -- it may be specify a subroutine or a routine. This datatype should
 -- be equivalent to the "entryref" of the MUMPS spec.
 data EntryRef = Routine Routineref
-              | Subroutine Label (Maybe Integer) Routineref
+              | Subroutine Label (Maybe Integer) (Maybe Routineref)
  deriving Show
 
 -- | The DLabel is tag pointed to by an enytryref, if the entryref
@@ -133,11 +135,11 @@ type Condition = Expression
 type Subscript = Expression
 
 -- | Each argument to KILL may be
---  * A variable name
---  * A list containing the names of variables
---    not to kill (the remainder are killed)
---  * An expression, evaluating to a list of 
---    valid kill arguments
+--  1) A variable name
+--  2) A list containing the names of variables
+--     not to kill (the remainder are killed)
+--  3) An expression, evaluating to a list of 
+--     valid kill arguments
 -- See 8.2.11
 data KillArg = KillSelective Vn
              | KillExclusive [Name]
@@ -464,26 +466,39 @@ parsePattern :: Parser Regex
 parsePattern = error "No pattern parser"
 
 -- Used in DoArg and GotoArg
+parseRoutineRef :: Parser Routineref
+parseRoutineRef = (do char '^'
+                      (do char '@'
+                          RoutinerefIndirect `liftM` parseExp)
+                        <|> Routineref `liftM` litName)
+
 parseEntryRef :: Parser EntryRef
-parseEntryRef = (do char '^'
-                    (do char '@'
-                        (Routine . RoutinerefIndirect) `liftM` parseExp)
-                    <|> (Routine . Routineref) `liftM` litName)
-                   
+parseEntryRef = (Routine `liftM` parseRoutineRef)
+            <|> (do label <- parseLabel
+                    offset <- parseOffset
+                    routine <- parseRoutine
+                    return $ Subroutine label offset routine)
+ where
+   parseLabel = (char '@' >> LabelIndirect `liftM` parseExp)
+            <|> (Label `liftM` litName)
+   parseOffset = (char '+' >> (Just . read) `liftM` many1 (oneOf "1234567890"))
+             <|> (return Nothing)
+   parseRoutine = (Just `liftM` parseRoutineRef)
+              <|> (return Nothing)
                       
                    
-
+-- |I forget where I use this.
 parseOrIndirect :: Parser a -> Parser (Either Expression a)
 parseOrIndirect p = (char '@' >> Left `liftM` parseExp)
                 <|> (Right `liftM` p)
 
 -- Differs from parseExp because a funarg may be either:
---  * An Expression
---  * A (local?) variable passed by ref
+--  1) An Expression
+--  2) A (local?) variable passed by ref
 parseFunArg :: Parser FunArg
 parseFunArg = error "parseFunArg not implemented"
 
--- Parses the name of a variable (with subscripts)
+-- |Parses the name of a variable (with subscripts)
 parseVn :: Parser Vn
 parseVn = (do char '@'
               exp <- parseExp
@@ -498,7 +513,7 @@ parseVn = (do char '@'
               args <- arglist parseExp
               return $ Lvn name args)
 
--- Parses a literal name.
+-- |Parses a literal name.
 litName :: Parser Name
 litName = do x <- oneOf (return '%' ++ ident)
              xs <- many (oneOf (ident ++ digits))
@@ -520,7 +535,7 @@ mlist1 pa = do
                         mlist pa) <|> return []
               return (x:xs)
 
--- Given a parser, parse a comma separated list of these surrounded by parens
+-- |Given a parser, parse a comma separated list of these surrounded by parens
 arglist :: Parser a -> Parser [a]
 arglist pa = do char '('
                 xs <- mlist pa
@@ -528,7 +543,7 @@ arglist pa = do char '('
                 return xs
          <|> return []
 
--- Given a parser, parse a comma separated non-empty list of these
+-- |Given a parser, parse a comma separated non-empty list of these
 -- surounded by parens
 arglist1 :: Parser a -> Parser [a]
 arglist1 pa = do char '('
