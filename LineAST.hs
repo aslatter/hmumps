@@ -341,7 +341,8 @@ parseHalt = do
 
 parseIf :: Parser Command
 parseIf = do stringOrPrefix1 "if"
-             error "No parser for IF"
+             (char ' ' >> If `liftM` mlist parseExp)
+              <|> (eof >> (return $ If []))
 
 parseKill :: Parser Command
 parseKill = do 
