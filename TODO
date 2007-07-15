@@ -1,13 +1,19 @@
 LineAST:
-	replace the "Location" datastructure with an
-	"EntryRef" datastructure, which subsumes the
-	MUMPS "entryref" and "labelref"
-
 	run the Main executable, and try to enter valid comands.
-	fix was doesn't work :)
+	fix what doesn't work :)
 
 	Change
 	> data Name = Name String
 	to 
 	> type Name = String
 	(along with everything that uses the constructor)
+
+	parseLocation doesn't work proper.
+	into Main, entering
+	> g somewhere
+	the text "somewhere" will be interpreted as the name of
+	a routine, when it should be the name of a label.
+
+	entering
+	> h:cond
+	seems to be broken

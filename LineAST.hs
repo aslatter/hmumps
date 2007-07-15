@@ -9,10 +9,13 @@ module LineAST (
                 Vn(..),
                 Label(..),
                 Routineref(..),
+                DoArg(..),
                 KillArg(..),
+                GotoArg(..),
                 MergeArg,
                 NewArg(..),
                 SetArg,
+                WriteArg,
                 Name(..),
                 -- ** Expressions
                 Expression(..),
