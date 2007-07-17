@@ -13,8 +13,8 @@ main = hSetBuffering stdout NoBuffering >> disclaimer >> loop
 loop = do 
        putStr "> "
        x <- getLine
-       case (head x) of
-          '!' -> interpreterCommands (tail x)
+       case x of
+          '!':xs -> interpreterCommands xs
 	  _ -> putStrLn (repl x) >> loop
 
 interpreterCommands :: String -> IO ()
