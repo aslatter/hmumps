@@ -19,6 +19,7 @@ loop = do
 
 interpreterCommands :: String -> IO ()
 interpreterCommands "q" = return ()
+interpreterCommands str = putStrLn ("Unknown interpreter command: " ++ str) >> loop
 
 repl :: String -> String
 repl x = case parse command "" x of
