@@ -8,13 +8,17 @@ import System.IO
 
 
 main :: IO ()
-main = disclaimer >> (loop $ do putStr "> "
-                                hFlush stdout
-                                x <- getLine
-                                putStrLn $ repl x)
+main = hSetBuffering stdout NoBuffering >> disclaimer >> loop 
 
-loop :: Monad m => m () -> m ()
-loop ma = ma >> (loop ma)
+loop = do 
+       putStr "> "
+       x <- getLine
+       case (head x) of
+          '!' -> interpreterCommands (tail x)
+	  _ -> putStrLn (repl x) >> loop
+
+interpreterCommands :: String -> IO ()
+interpreterCommands "q" = return ()
 
 repl :: String -> String
 repl x = case parse command "" x of

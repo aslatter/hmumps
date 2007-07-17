@@ -44,6 +44,17 @@ import Text.Regex
 
 import MValue
 
+{- Definition of lexical tokens follows:
+   routinehead -> name eol
+   name -> startname [alphanumeric]
+   startname -> % | ['A'..'Z']++['a'..'z']
+   digit -> ['0'..'9']
+   control -> 127:[0..31] 
+   graphic -> [x | x<-[0..255], not (elem x control)]
+   eol -> '\n'
+
+-}
+
 -- Where we put this may change, but I'm going to just include the pre
 -- processing here so that we can know where we stand.  The fundamental
 -- assumptions that can go into the true parsing is that 
@@ -361,11 +372,13 @@ parseMerge = do stringOrPrefix1 "merge"
 
 parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
+              cond <- postCondition
               error "No parser for NEW"
 
 parseRead :: Parser Command
 parseRead = do stringOrPrefix1 "read"
                error "No parser for READ"
+
 
 parseSet :: Parser Command
 parseSet = do stringOrPrefix1 "set"
