@@ -8,20 +8,28 @@ import System.IO
 
 
 main :: IO ()
-main = hSetBuffering stdout NoBuffering >> disclaimer >> loop 
+main = hSetBuffering stdout NoBuffering >> splash >> loop 
 
 loop = do 
        putStr "> "
        x <- getLine
        case x of
-          '!':xs -> maybe onNothing id (interpreterCommands xs)
-              where onNothing = putStrLn ("Unknown command: " ++ xs) >> loop
+          '!':xs -> interpreterCommands xs loop
 	  _ -> (repl . strip) x >> loop
 
 
-interpreterCommands :: String -> Maybe (IO ())
-interpreterCommands "q" = Just (return ())
-interpreterCommands str = Nothing
+interpreterCommands :: String -> IO () -> IO ()
+interpreterCommands "q" _    = return ()
+interpreterCommands "w" next = mapM_ putStrLn 
+ ["  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY",
+  "APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT",
+  "HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY",
+  "OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,",
+  "THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR",
+  "PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM",
+  "IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF",
+  "ALL NECESSARY SERVICING, REPAIR OR CORRECTION."] >> next
+interpreterCommands str next = putStrLn ("Unkown interpreter command: " ++ str) >> next
 
 repl :: String -> IO ()
 repl [] = return ()
@@ -29,10 +37,10 @@ repl x = putStrLn $ case parse command "" x of
                       Left err -> show err
                       Right expTree -> show expTree
 
-disclaimer :: IO ()
-disclaimer = do putStrLn "HMUMPS  Copyright (C) 2007  Antoine Latter, Creighton Hogg"
-                putStrLn "This program comes with ABSOLUTELY NO WARRANTY; for details see"
-                putStrLn "the enclosed LISCENSE file."
-                putStrLn "This is free software, and you are welcome to redistribute it"
-                putStrLn "under certain conditions; for details see the enclosed LISCENSE file."
-                putStrLn ""
+splash :: IO ()
+splash = mapM_ putStrLn 
+ ["HMUMPS  Copyright (C) 2007  Antoine Latter, Creighton Hogg",
+  "This program comes with ABSOLUTELY NO WARRANTY; for details type `!w'.",
+  "This is free software, and you are welcome to redistribute it",
+  "under certain conditions; for details see the enclosed LISCENSE file.",
+  ""]
