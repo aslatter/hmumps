@@ -230,7 +230,8 @@ instance Show Regex where
 
 data UnaryOp = UNot | UPlus | UMinus
  deriving Show
-data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow
+data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow | And | Or
+             | Equal | LessThan | GreaterThan | Follows | Contains | SortsAfter
  deriving Show
 -- missing a few binops.  not sure where ], [, and ]] are in the spec
 
@@ -473,6 +474,13 @@ parseBinop = (char '_'  >> return Concat)
          <|> (char '/'  >> return Div)
          <|> (char '#'  >> return Rem)
          <|> (char '\\' >> return Quot)
+         <|> (char '&'  >> return And)
+         <|> (char '!'  >> return Or)
+         <|> (char '='  >> return Equal)
+         <|> (char '<'  >> return LessThan)
+         <|> (char '>'  >> return GreaterThan)
+         <|> (char ']'  >> ((char ']' >> return SortsAfter) <|> return Follows))
+         <|> (char '['  >> return Contains)
          <?> "binary operator"
 
 parsePattern :: Parser Regex
