@@ -14,12 +14,14 @@ loop = do
        putStr "> "
        x <- getLine
        case x of
-          '!':xs -> interpreterCommands xs loop
+          '!':xs -> maybe onNothing id (interpreterCommands xs)
+              where onNothing = putStrLn ("Unknown command: " ++ xs) >> loop
 	  _ -> (repl . strip) x >> loop
 
-interpreterCommands :: String -> IO () -> IO ()
-interpreterCommands "q" _    = return ()
-interpreterCommands str next = putStrLn ("Unknown interpreter command: " ++ str) >> next
+
+interpreterCommands :: String -> Maybe (IO ())
+interpreterCommands "q" = Just (return ())
+interpreterCommands str = Nothing
 
 repl :: String -> IO ()
 repl [] = return ()
