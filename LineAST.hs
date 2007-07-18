@@ -25,6 +25,7 @@ module LineAST (
                 BinOp(..),
                 -- * Parsering related functionality
                 initLex,
+                strip,
                 comment,
                 parseCommands,
                 command,
@@ -69,7 +70,10 @@ import MValue
 --  * Removes comments
 --  * Removes trailing whitespace
 initLex :: String -> [String]
-initLex = map ((takeWhile (/=';')) . reverse . (dropWhile whitespace) . reverse ) . lines
+initLex = map strip . lines
+
+strip :: String -> String
+strip = reverse . (dropWhile whitespace) . reverse . (takeWhile (/=';'))
     where whitespace x = any (==x) [' ','\t','\r']
 
 -- AST data structures

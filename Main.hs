@@ -15,16 +15,17 @@ loop = do
        x <- getLine
        case x of
           '!':xs -> interpreterCommands xs
-	  _ -> putStrLn (repl x) >> loop
+	  _ -> (repl . strip) x >> loop
 
 interpreterCommands :: String -> IO ()
 interpreterCommands "q" = return ()
 interpreterCommands str = putStrLn ("Unknown interpreter command: " ++ str) >> loop
 
-repl :: String -> String
-repl x = case parse command "" x of
-         Left err -> show err
-         Right expTree -> show expTree
+repl :: String -> IO ()
+repl [] = return ()
+repl x = putStrLn $ case parse command "" x of
+                      Left err -> show err
+                      Right expTree -> show expTree
 
 disclaimer :: IO ()
 disclaimer = do putStrLn "HMUMPS  Copyright (C) 2007  Antoine Latter, Creighton Hogg"
