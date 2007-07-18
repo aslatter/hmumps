@@ -14,12 +14,12 @@ loop = do
        putStr "> "
        x <- getLine
        case x of
-          '!':xs -> interpreterCommands xs
+          '!':xs -> interpreterCommands xs loop
 	  _ -> (repl . strip) x >> loop
 
-interpreterCommands :: String -> IO ()
-interpreterCommands "q" = return ()
-interpreterCommands str = putStrLn ("Unknown interpreter command: " ++ str) >> loop
+interpreterCommands :: String -> IO () -> IO ()
+interpreterCommands "q" _    = return ()
+interpreterCommands str next = putStrLn ("Unknown interpreter command: " ++ str) >> next
 
 repl :: String -> IO ()
 repl [] = return ()
