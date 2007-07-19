@@ -73,7 +73,7 @@ initLex :: String -> [String]
 initLex = map strip . lines
 
 strip :: String -> String
-strip = reverse . (dropWhile whitespace) . reverse . (takeWhile (/=';'))
+strip = (dropWhile whitespace) . reverse . (dropWhile whitespace) . reverse . (takeWhile (/=';'))
     where whitespace x = any (==x) [' ','\t','\r']
 
 -- AST data structures
