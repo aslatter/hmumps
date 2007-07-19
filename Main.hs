@@ -5,17 +5,19 @@ import LineAST
 import Control.Monad
 import Text.ParserCombinators.Parsec
 import System.IO
-
+import System.Console.Readline -- Note, uses GNU readline, under GPL
 
 main :: IO ()
 main = hSetBuffering stdout NoBuffering >> splash >> loop 
 
-loop = do 
-       putStr "> "
-       x <- getLine
-       case x of
-          '!':xs -> interpreterCommands xs loop
-	  _ -> (repl . strip) x >> loop
+loop :: IO ()
+loop = do line <- readline "> "
+          case line of
+            Just x -> do addHistory x
+                         case x of
+                           '!':xs -> interpreterCommands xs loop
+	                   _ -> (repl . strip) x >> loop
+            Nothing -> putStrLn "" >> return ()
 
 
 interpreterCommands :: String -> IO () -> IO ()
