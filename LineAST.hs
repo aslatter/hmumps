@@ -302,7 +302,7 @@ parseDo = do stringOrPrefix1 "do"
                      return $ Do cond []
 
 parseDoArg :: Parser DoArg
-parseDoArg = (do char '@'; exp <- parseExp; return $ DoArgIndirect exp)
+parseDoArg = (do char '@'; expr <- parseExp; return $ DoArgIndirect expr)
          <|> (do loc <- parseEntryRef
                  args <- arglist parseFunArg
                  cond <- postCondition
@@ -320,7 +320,7 @@ parseGoto = do stringOrPrefix1 "goto"
                        return $ Goto cond []
 
 parseGotoArg :: Parser GotoArg
-parseGotoArg = (do char '@'; exp <- parseExp; return $ GotoArgIndirect exp)
+parseGotoArg = (do char '@'; expr <- parseExp; return $ GotoArgIndirect expr)
            <|> (do loc <- parseEntryRef
                    cond <- postCondition
                    return $ GotoArg cond loc)
@@ -377,7 +377,7 @@ parseMerge = do stringOrPrefix1 "merge"
 
 parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
-              cond <- postCondition
+              _ <- postCondition
               error "No parser for NEW"
 
 parseRead :: Parser Command
@@ -413,7 +413,7 @@ parseExp = do let parseExpAtom :: Parser Expression
                   parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
 
                   parseExpUnop :: Parser Expression
-                  parseExpUnop = (do unop <- parseUnop; exp <- parseExpAtom; return $ ExpUnop unop exp)
+                  parseExpUnop = (do unop <- parseUnop; expr <- parseExpAtom; return $ ExpUnop unop expr)
 
                   parseWrapper :: Parser ((Expression -> Expression) -> Expression -> Expression)
                   parseWrapper = (do char '\''; return $ \f x -> ExpUnop UNot (f x)) <|> (return id)
@@ -421,8 +421,8 @@ parseExp = do let parseExpAtom :: Parser Expression
                   parseTailItem :: Parser (Expression -> Expression)
                   parseTailItem = do wrapper <- parseWrapper;
                                      ((do binop <- parseBinop;
-                                          exp <- parseExpAtom;
-                                          return $ wrapper  $ \x -> ExpBinop binop x exp)
+                                          expr <- parseExpAtom;
+                                          return $ wrapper  $ \x -> ExpBinop binop x expr)
                                       <|>(do char '?';
                                              pat <- parsePattern;
                                              return $ wrapper $ \x -> Pattern x pat))
@@ -447,9 +447,9 @@ parseExpFuncall = do char '$'
 
 parseSubExp :: Parser Expression
 parseSubExp = do char '('
-                 exp <- parseExp
+                 expr <- parseExp
                  char ')'
-                 return exp
+                 return expr
 
 -- Take a positive number or a string.  Any leading -/+ signs should've
 -- been picked up by parseExpUnop by now.
@@ -499,10 +499,10 @@ parseRoutineRef = (do char '^'
 
 parseEntryRef :: Parser EntryRef
 parseEntryRef = (Routine `liftM` parseRoutineRef)
-            <|> (do label <- parseLabel
+            <|> (do lbl <- parseLabel
                     offset <- parseOffset
                     routine <- parseRoutine
-                    return $ Subroutine label offset routine)
+                    return $ Subroutine lbl offset routine)
  where
    parseLabel = (char '@' >> LabelIndirect `liftM` parseExp)
             <|> (Label `liftM` litName)
@@ -512,11 +512,6 @@ parseEntryRef = (Routine `liftM` parseRoutineRef)
               <|> (return Nothing)
                       
                    
--- |I forget where I use this.
-parseOrIndirect :: Parser a -> Parser (Either Expression a)
-parseOrIndirect p = (char '@' >> Left `liftM` parseExp)
-                <|> (Right `liftM` p)
-
 -- Differs from parseExp because a funarg may be either:
 --  1) An Expression
 --  2) A (local?) variable passed by ref
@@ -526,10 +521,10 @@ parseFunArg = error "parseFunArg not implemented"
 -- |Parses the name of a variable (with subscripts)
 parseVn :: Parser Vn
 parseVn = (do char '@'
-              exp <- parseExp
+              expr <- parseExp
               args <- (do char '@'
                           arglist parseExp) <|> return []
-              return $ IndirectVn exp args)
+              return $ IndirectVn expr args)
       <|> (do char '^'
               name <- litName
               args <- arglist parseExp
