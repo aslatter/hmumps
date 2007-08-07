@@ -1,3 +1,5 @@
+{-# OPTIONS -Wall -Werror #-}
+
 module MArray (
                MArray,
                mEmpty,

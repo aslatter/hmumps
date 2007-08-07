@@ -1,3 +1,5 @@
+{-# OPTIONS -Wall -Werror #-}
+
 -- |This module contains everything needed to do the initial parsing
 -- of either a MUMPS routine or MUMPS commands entered at a REPL
 module LineAST (

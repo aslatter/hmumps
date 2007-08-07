@@ -1,3 +1,5 @@
+{-# OPTIONS -Wall -Werror #-}
+
 -- |This module defines the basic MUMPS type: the MValue
 module MValue where
 
