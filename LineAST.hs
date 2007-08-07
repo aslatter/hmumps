@@ -465,7 +465,7 @@ parseNumLit = do xs <- many1 digit
 -- Does not work for quote-marks inside a string
 parseStringLit :: Parser Expression
 parseStringLit = do char '"'
-                    xs <- many (noneOf "\"")
+                    xs <- many $ (try $ do string "\"\"";return '\"' ) <|> (noneOf "\"")
                     char '"'
                     (return . ExpLit . String) xs
 
