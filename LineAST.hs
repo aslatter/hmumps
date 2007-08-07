@@ -163,7 +163,8 @@ data KillArg = KillSelective Vn
 
 -- |An argument to merge specifies a source and a target.
 -- See 8.2.13
-type MergeArg = (Vn,Vn)
+data MergeArg = MergeArg Vn Vn | MergeArgIndirect Expression
+ deriving Show
 
 
 -- New should probably be broken up into more primative commands
@@ -373,7 +374,16 @@ parseKill = do
 
 parseMerge :: Parser Command               
 parseMerge = do stringOrPrefix1 "merge"
-                error "No parser for MERGE"
+                cond <- postCondition
+                char ' '
+                args <- mlist parseMergeArg
+                return $ Merge cond args
+
+parseMergeArg :: Parser MergeArg
+parseMergeArg = (do char '@'
+                    expr <- parseExpAtom
+                    return $ MergeArgIndirect expr)
+            <|> (liftM2 MergeArg parseVn (char '=' >> parseVn))
 
 parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
