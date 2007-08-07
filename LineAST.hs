@@ -287,7 +287,7 @@ parseBreak = do stringOrPrefix1 "break"
 
 postCondition :: Parser (Maybe Expression)
 postCondition = do char ':'
-                   cond <- parseExp
+                   cond <- parseExpAtom
                    return $ Just cond
       <|> return Nothing
 
@@ -302,7 +302,7 @@ parseDo = do stringOrPrefix1 "do"
                      return $ Do cond []
 
 parseDoArg :: Parser DoArg
-parseDoArg = (do char '@'; expr <- parseExp; return $ DoArgIndirect expr)
+parseDoArg = (do char '@'; expr <- parseExpAtom; return $ DoArgIndirect expr)
          <|> (do loc <- parseEntryRef
                  args <- arglist parseFunArg
                  cond <- postCondition
@@ -320,7 +320,7 @@ parseGoto = do stringOrPrefix1 "goto"
                        return $ Goto cond []
 
 parseGotoArg :: Parser GotoArg
-parseGotoArg = (do char '@'; expr <- parseExp; return $ GotoArgIndirect expr)
+parseGotoArg = (do char '@'; expr <- parseExpAtom; return $ GotoArgIndirect expr)
            <|> (do loc <- parseEntryRef
                    cond <- postCondition
                    return $ GotoArg cond loc)
@@ -394,7 +394,7 @@ parseWrite = do stringOrPrefix1 "write"
                 error "No parser for WRITE"
 
 parseKillArg :: Parser KillArg
-parseKillArg = (KillIndirect `liftM` (char '@' >> parseExp))
+parseKillArg = (KillIndirect `liftM` (char '@' >> parseExpAtom))
            <|> (KillExclusive `liftM` arglist1 litName)
            <|> (KillSelective `liftM` parseVn)
 
@@ -407,15 +407,12 @@ stringOrPrefix1 (x:xs) = do y <- char x
                             ys <- stringOrPrefix xs
                             return (y:ys)
 
+parseExpAtom :: Parser Expression
+parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
+
 -- |Parse an expression.  Is not at all forgiving about extraneous whitespace.
 parseExp :: Parser Expression
-parseExp = do let parseExpAtom :: Parser Expression
-                  parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
-
-                  parseExpUnop :: Parser Expression
-                  parseExpUnop = (do unop <- parseUnop; expr <- parseExpAtom; return $ ExpUnop unop expr)
-
-                  parseWrapper :: Parser ((Expression -> Expression) -> Expression -> Expression)
+parseExp = do let parseWrapper :: Parser ((Expression -> Expression) -> Expression -> Expression)
                   parseWrapper = (do char '\''; return $ \f x -> ExpUnop UNot (f x)) <|> (return id)
 
                   parseTailItem :: Parser (Expression -> Expression)
@@ -431,6 +428,9 @@ parseExp = do let parseExpAtom :: Parser Expression
               tails <- many parseTailItem
 
               return $ foldl (flip (.)) id tails $ exp1 
+
+parseExpUnop :: Parser Expression
+parseExpUnop = (do unop <- parseUnop; expr <- parseExpAtom; return $ ExpUnop unop expr)
 
 parseUnop :: Parser UnaryOp
 parseUnop = (do char '\''; return UNot)
@@ -494,7 +494,7 @@ parsePattern = error "No pattern parser"
 parseRoutineRef :: Parser Routineref
 parseRoutineRef = (do char '^'
                       (do char '@'
-                          RoutinerefIndirect `liftM` parseExp)
+                          RoutinerefIndirect `liftM` parseExpAtom)
                         <|> Routineref `liftM` litName)
 
 parseEntryRef :: Parser EntryRef
@@ -504,7 +504,7 @@ parseEntryRef = (Routine `liftM` parseRoutineRef)
                     routine <- parseRoutine
                     return $ Subroutine lbl offset routine)
  where
-   parseLabel = (char '@' >> LabelIndirect `liftM` parseExp)
+   parseLabel = (char '@' >> LabelIndirect `liftM` parseExpAtom)
             <|> (Label `liftM` litName)
    parseOffset = (char '+' >> (Just . read) `liftM` many1 (oneOf "1234567890"))
              <|> (return Nothing)
@@ -521,7 +521,7 @@ parseFunArg = error "parseFunArg not implemented"
 -- |Parses the name of a variable (with subscripts)
 parseVn :: Parser Vn
 parseVn = (do char '@'
-              expr <- parseExp
+              expr <- parseExpAtom
               args <- (do char '@'
                           arglist parseExp) <|> return []
               return $ IndirectVn expr args)
