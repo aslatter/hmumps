@@ -1,7 +1,7 @@
 module Testing 
     where
     
-import HMumps.LineAST
+import HMumps.Parsers
 import Data.MValue
 import Data.MArray
 import Test.QuickCheck

@@ -2,7 +2,7 @@
 
 module Main where
 
-import HMumps.LineAST
+import HMumps.Parsers
 
 import Control.Monad
 import Text.ParserCombinators.Parsec
