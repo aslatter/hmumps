@@ -226,7 +226,7 @@ data Expression
     | BIFCall String [Expression]
     -- |You can even call your own functions!  Locally defined
     -- functions need not specify the parent routine.
-    | Funcal  String (Maybe String) [Expression]
+    | FunCall  String (Maybe String) [FunArg]
     -- |A pattern match is similar to a regular expression match.
     -- This binary operator returns either 0 or 1.
     | Pattern Expression Regex
@@ -378,7 +378,7 @@ parseMerge :: Parser Command
 parseMerge = do stringOrPrefix1 "merge"
                 cond <- postCondition
                 char ' '
-                args <- mlist parseMergeArg
+                args <- mlist1 parseMergeArg
                 return $ Merge cond args
 
 parseMergeArg :: Parser MergeArg
@@ -386,11 +386,22 @@ parseMergeArg = (do char '@'
                     expr <- parseExpAtom
                     return $ MergeArgIndirect expr)
             <|> (liftM2 MergeArg parseVn (char '=' >> parseVn))
+            <?> "MERGE argument or indirection"
 
 parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
-              _ <- postCondition
-              error "No parser for NEW"
+              cond <- postCondition
+              (char ' ' >>  New cond `liftM` (mlist parseNewArg))
+               <|> (eof >> (return $ New cond []))
+
+parseNewArg :: Parser NewArg
+parseNewArg = (do char '('
+                  args <- mlist litName
+                  char ')'
+                  return $ NewExclusive args)
+          <|> (NewIndirect `liftM` (char '@' >> parseExpAtom))
+          <|> NewSelective `liftM` litName
+          
 
 parseRead :: Parser Command
 parseRead = do stringOrPrefix1 "read"
@@ -455,7 +466,18 @@ parseExpVn = do vn <- parseVn
 
 parseExpFuncall :: Parser Expression
 parseExpFuncall = do char '$'
-                     error "parseExpFuncall undefined"
+                     (do name <- parseValidName
+                         args <- arglist parseExp
+                         return $ BIFCall name args)
+                      <|> (do char '$'
+                              name1 <- parseValidName
+                              (do char '^'
+                                  name2 <- parseValidName
+                                  args <- arglist parseFunArg
+                                  return $ FunCall name1 (Just name2) args)
+                               <|> (do args <- arglist parseFunArg
+                                       return $ FunCall name1 Nothing args))
+                      
 
 parseSubExp :: Parser Expression
 parseSubExp = do char '('
@@ -477,9 +499,11 @@ parseNumLit = do xs <- many1 digit
 -- Does not work for quote-marks inside a string
 parseStringLit :: Parser Expression
 parseStringLit = do char '"'
-                    xs <- many $ (try $ do string "\"\"";return '\"' ) <|> (noneOf "\"")
+                    xs <- many $ (try $ do string "\"\"";return '\"') <|> (noneOf "\"")
                     char '"'
                     (return . ExpLit . String) xs
+
+-- I consider every "try" in a parsec parser a personal failure.
 
 -- No guarantees that the list of binops is complete.
 parseBinop :: Parser BinOp
@@ -528,7 +552,9 @@ parseEntryRef = (Routine `liftM` parseRoutineRef)
 --  1) An Expression
 --  2) A (local?) variable passed by ref
 parseFunArg :: Parser FunArg
-parseFunArg = error "parseFunArg not implemented"
+parseFunArg = (do char '.'
+                  FunArgName `liftM` litName)
+          <|> (FunArgExp `liftM` parseExp)
 
 -- |Parses the name of a variable (with subscripts)
 parseVn :: Parser Vn
@@ -544,15 +570,18 @@ parseVn = (do char '@'
       <|> (do name <- litName
               args <- arglist parseExp
               return $ Lvn name args)
+      <?> "variable name"
 
 -- |Parses a literal name.
 litName :: Parser Name
-litName = do x <- oneOf (return '%' ++ ident)
-             xs <- many (oneOf (ident ++ digits))
-             return . Name $ x:xs
+litName = Name `liftM` parseValidName
+                         
+parseValidName :: Parser String
+parseValidName = do x <- oneOf (return '%' ++ ident)
+                    xs <- many (oneOf (ident ++ digits))
+                    return (x:xs)
  where ident = ['a'..'z'] ++ ['A'..'Z']
        digits = ['0'..'9']
-                         
 
 -- |Given a parser, parse a comma separated list of these.
 mlist :: Parser a -> Parser [a]
