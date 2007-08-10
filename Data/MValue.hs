@@ -1,7 +1,7 @@
 {-# OPTIONS -Wall -Werror #-}
 
 -- |This module defines the basic MUMPS type: the MValue
-module MValue where
+module Data.MValue where
 
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com

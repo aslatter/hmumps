@@ -1,6 +1,6 @@
 {-# OPTIONS -Wall -Werror #-}
 
-module MArray (
+module Data.MArray (
                MArray,
                mEmpty,
                mIndex,
@@ -12,7 +12,7 @@ module MArray (
 -- aslatter@gmail.com
 
 import Data.Map
-import MValue
+import Data.MValue
 import Prelude hiding (lookup,null)
 
 data MArray = MArray (Maybe MValue) (Map MValue MArray)

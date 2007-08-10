@@ -1,9 +1,9 @@
 module Testing 
     where
     
-import LineAST
-import MValue
-import MArray
+import HMumps.LineAST
+import Data.MValue
+import Data.MArray
 import Test.QuickCheck
 
 instance Arbitrary Char where

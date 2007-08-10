@@ -2,7 +2,7 @@
 
 -- |This module contains everything needed to do the initial parsing
 -- of either a MUMPS routine or MUMPS commands entered at a REPL
-module LineAST (
+module HMumps.LineAST (
                 -- * Syntax-Tree Types
                 -- ** Commands
                 Command(..),
@@ -45,7 +45,7 @@ import Control.Monad
 import Text.ParserCombinators.Parsec
 import Text.Regex
 
-import MValue
+import Data.MValue
 
 {- Definition of lexical tokens follows:
    routinehead -> name eol
