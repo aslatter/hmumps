@@ -38,11 +38,11 @@ strip = (dropWhile whitespace) . reverse . (dropWhile whitespace) . reverse . (t
 
 -- |Parse Commands is fed a LINE of MUMPS (after line-level has been detrimined).
 parseCommands :: Parser [Command]
-parseCommands = do many spaces
+parseCommands = do spaces
                    (do x <- command;
                        xs <- parseCommands;
                        return (x:xs)) <|> (do comment;
-                                              return []) <|> (return [])
+                                              return []) <|> (eof >> return [])
 -- I think I do this wrong, because I'm not sure what happens on
 -- mal-formed input.  anyway, I think it's better than it was.
 

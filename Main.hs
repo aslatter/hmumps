@@ -37,7 +37,7 @@ interpreterCommands str next = putStrLn ("Unkown interpreter command: " ++ str) 
 
 repl :: String -> IO ()
 repl [] = return ()
-repl x = putStrLn $ case parse command "" x of
+repl x = putStrLn $ case parse parseCommands "" x of
                       Left err -> show err
                       Right expTree -> show expTree
 
