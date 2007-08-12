@@ -91,6 +91,7 @@ data Command = Break (Maybe Condition)
              | Kill (Maybe Condition) [KillArg]
              | Merge (Maybe Condition) [MergeArg]
              | New (Maybe Condition) [NewArg]
+             | Quit (Maybe Condition) (Maybe Expression)
              | Read (Maybe Condition) [WriteArg] Vn
              | Set (Maybe Condition) [SetArg]
              | Write (Maybe Condition) [WriteArg]

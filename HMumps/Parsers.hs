@@ -64,6 +64,7 @@ command = parseBreak
       <|> parseKill
       <|> parseMerge
       <|> parseNew
+      <|> parseQuit
       <|> parseRead
       <|> parseSet
       <|> parseWrite <?> "MUMPS command"
@@ -186,6 +187,13 @@ parseNewArg = (do char '('
                   return $ NewExclusive args)
           <|> (NewIndirect `liftM` (char '@' >> parseExpAtom))
           <|> NewSelective `liftM` litName
+
+parseQuit :: Parser Command
+parseQuit = do stringOrPrefix1 "quit"
+               return Quit `ap` postCondition `ap` quitArg
+ where quitArg = (char ' ' >> (Just `liftM` parseExp <|> (char ' ' >> return Nothing)))
+             <|> (eof >> return Nothing)
+
           
 
 parseRead :: Parser Command
