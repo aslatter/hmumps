@@ -349,7 +349,7 @@ parseVn = (do char '@'
                           arglist parseExp) <|> return []
               return $ IndirectVn expr args)
       <|> (do char '^'
-              name <- litName
+              name <- litName <|> return ""
               args <- arglist parseExp
               return $ Gvn name args)
       <|> (do name <- litName
