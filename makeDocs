@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# assumes that the "docs" directory exists.
+
+find . | egrep "\.hs$" | egrep -v darcs\|Testing | xargs haddock -o docs -h
