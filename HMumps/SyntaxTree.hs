@@ -19,7 +19,7 @@ module HMumps.SyntaxTree (
                 NewArg(..),
                 SetArg,
                 WriteArg,
-                Name(..),
+                Name,
                 -- ** Expressions
                 Expression(..),
                 Condition,
@@ -174,15 +174,7 @@ data FunArg = FunArgExp Expression
             | FunArgName Name
  deriving Show
 
--- |A Name is the title of a routine, tag or variable.
-data Name
-    -- | This is the string which would appear in the symbol
-    -- table.
-    = Name String
-    -- |An LName is the indirect form of a name, and should
-    -- evaluate to a valid Name.
-    | LName Expression
- deriving Show
+type Name = String
 
 
 -- there's somehting I'm not groking wrt the standard and expressions.

@@ -359,7 +359,7 @@ parseVn = (do char '@'
 
 -- |Parses a literal name.
 litName :: Parser Name
-litName = Name `liftM` parseValidName
+litName = parseValidName
                          
 parseValidName :: Parser String
 parseValidName = do x <- oneOf (return '%' ++ ident)
