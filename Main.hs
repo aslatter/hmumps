@@ -10,7 +10,7 @@ import System.IO
 import System.Console.Readline -- Note, uses GNU readline, under GPL
 
 main :: IO ()
-main = hSetBuffering stdout NoBuffering >> splash >> loop 
+main = hSetBuffering stdout NoBuffering >> putStrLn splash >> loop 
 
 loop :: IO ()
 loop = do line <- readline "> "
@@ -37,14 +37,14 @@ interpreterCommands str next = putStrLn ("Unkown interpreter command: " ++ str) 
 
 repl :: String -> IO ()
 repl [] = return ()
-repl x = putStrLn $ case parse parseCommands "" x of
-                      Left err -> show err
-                      Right expTree -> show expTree
+repl x = case parse parseCommands "" x of
+           Left err -> putStrLn $ show err
+           Right xs -> sequence_ $ map (putStrLn . show) xs
 
-splash :: IO ()
-splash = mapM_ putStrLn 
- ["HMUMPS  Copyright (C) 2007  Antoine Latter, Creighton Hogg",
-  "This program comes with ABSOLUTELY NO WARRANTY; for details type `!w'.",
-  "This is free software, and you are welcome to redistribute it",
-  "under certain conditions; for details see the enclosed LISCENSE file.",
+splash :: String
+splash = concat 
+ ["HMUMPS  Copyright (C) 2007  Antoine Latter, Creighton Hogg\n",
+  "This program comes with ABSOLUTELY NO WARRANTY; for details type `!w'.\n",
+  "This is free software, and you are welcome to redistribute it\n",
+  "under certain conditions; for details see the enclosed LICENSE file.\n",
   ""]

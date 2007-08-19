@@ -109,7 +109,7 @@ parseGoto = do stringOrPrefix1 "goto"
                        return $ Goto cond []
 
 parseGotoArg :: Parser GotoArg
-parseGotoArg = (do char '@'; expr <- parseExpAtom; return $ GotoArgIndirect expr)
+parseGotoArg = (try (do char '@'; expr <- parseExpAtom; return $ GotoArgIndirect expr))
            <|> (do loc <- parseEntryRef
                    cond <- postCondition
                    return $ GotoArg cond loc)
@@ -203,7 +203,12 @@ parseRead = do stringOrPrefix1 "read"
 
 parseSet :: Parser Command
 parseSet = do stringOrPrefix1 "set"
-              error "No parser for SET"
+              char ' '
+              return Set `ap` postCondition `ap` setArgs
+ where setArgs = mlist1 $ do lhs <- arglist1 parseVn <|> liftM (\x->[x]) parseVn
+                             char '='
+                             rhs <- parseExp
+                             return (lhs,rhs)
 
 parseWrite :: Parser Command
 parseWrite = do stringOrPrefix1 "write"

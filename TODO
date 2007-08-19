@@ -4,12 +4,6 @@ LineAST:
 	run the Main executable, and try to enter valid comands.
 	fix what doesn't work :)
 
-	Change
-	> data Name = Name String
-	to 
-	> type Name = String
-	(along with everything that uses the constructor)
-
 	entering
 	> h:cond
 	seems to be broken

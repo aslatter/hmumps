@@ -18,7 +18,8 @@ module HMumps.SyntaxTree (
                 MergeArg(..),
                 NewArg(..),
                 SetArg,
-                WriteArg,
+                WriteArg(..),
+                WriteFormatCode(..),
                 Name,
                 -- ** Expressions
                 Expression(..),
@@ -159,7 +160,14 @@ data NewArg = NewSelective Name
             | NewIndirect  Expression
  deriving Show
 
-type WriteArg = ()
+data WriteArg = WriteExpression Expression
+              | WriteFormat [WriteFormatCode]
+ deriving Show
+
+data WriteFormatCode = Formfeed
+                     | Newline
+                     | Tab Int
+ deriving Show
 
 -- |Vn describes the name of a variable, which may be local, global,
 -- or indirect.  Each form may optionally indicate a Subscript.
