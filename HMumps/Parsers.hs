@@ -204,11 +204,11 @@ parseRead = do stringOrPrefix1 "read"
 parseSet :: Parser Command
 parseSet = do stringOrPrefix1 "set"
               char ' '
-              return Set `ap` postCondition `ap` setArgs
- where setArgs = mlist1 $ do lhs <- arglist1 parseVn <|> liftM (\x->[x]) parseVn
-                             char '='
-                             rhs <- parseExp
-                             return (lhs,rhs)
+              return Set `ap` postCondition `ap` mlist1 setArg
+ where setArg = do lhs <- arglist1 parseVn <|> liftM (\x->[x]) parseVn
+                   char '='
+                   rhs <- parseExp
+                   return (lhs,rhs)
 
 parseWrite :: Parser Command
 parseWrite = do stringOrPrefix1 "write"
