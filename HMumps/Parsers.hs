@@ -212,7 +212,19 @@ parseSet = do stringOrPrefix1 "set"
 
 parseWrite :: Parser Command
 parseWrite = do stringOrPrefix1 "write"
-                error "No parser for WRITE"
+                char ' '
+                return Write `ap` postCondition `ap` mlist1 parseWriteArg
+
+parseWriteArg :: Parser WriteArg
+parseWriteArg = (WriteFormat `liftM` many1 parseWriteFormatCode)
+            <|> (WriteExpression `liftM` parseExp)
+
+parseWriteFormatCode :: Parser WriteFormatCode
+parseWriteFormatCode = (char '#' >> return Formfeed)
+                   <|> (char '!' >> return Newline)
+                   <|> (char '?' >> return Tab `ap` parseInt)
+ where parseInt :: Parser Int
+       parseInt = return read `ap` many1 (oneOf ['0'..'9'])
 
 parseKillArg :: Parser KillArg
 parseKillArg = (KillIndirect `liftM` (char '@' >> parseExpAtom))
