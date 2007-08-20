@@ -13,6 +13,7 @@ module HMumps.SyntaxTree (
                 Label(..),
                 Routineref(..),
                 DoArg(..),
+                ForArg(..),
                 KillArg(..),
                 GotoArg(..),
                 MergeArg(..),
@@ -81,10 +82,8 @@ import Data.MValue
 data Command = Break (Maybe Condition)
              | Do (Maybe Condition) [DoArg]
              | Else
-             | For
-             | For1 Vn Expression
-             | For2 Vn Expression Expression
-             | ForEach Vn [Expression]
+             | For Vn ForArg
+             | ForInf
              | Goto (Maybe Condition) [GotoArg]
              | Halt (Maybe Condition)
              | Hang (Maybe Condition) Expression
@@ -101,6 +100,11 @@ data Command = Break (Maybe Condition)
 
 data DoArg = DoArg (Maybe Condition) EntryRef [FunArg]
            | DoArgIndirect Expression
+ deriving Show
+
+data ForArg = ForArg1 Expression
+            | ForArg2 Expression Expression
+            | ForArg3 Expression Expression Expression
  deriving Show
 
 data GotoArg = GotoArg (Maybe Condition) EntryRef

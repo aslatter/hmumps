@@ -114,17 +114,30 @@ parseGotoArg = (try (do char '@'; expr <- parseExpAtom; return $ GotoArgIndirect
                    cond <- postCondition
                    return $ GotoArg cond loc)
 
--- Will not work for an end-of-line do statment
 parseElse :: Parser Command
 parseElse = do
   stringOrPrefix1 "else"
-  char ' '
-  char ' '
+  eof <|> do char ' '
+             eof <|> (char ' ' >> return ())
   return Else
 
 parseFor :: Parser Command
 parseFor = do stringOrPrefix1 "for"
-              error "No parser for FOR"
+              (do char ' ' 
+                  vn <- parseLvn
+                  char '='
+                  arg <- forArg
+                  return $ For vn arg)
+               <|> (do eof <|> (char ' ' >> (eof <|> (char ' ' >> return ())))
+                       return ForInf)                       
+
+ where forArg :: Parser ForArg
+       forArg = do args <- colonlist parseExp
+                   case length args of
+                     1 -> return $ ForArg1 (head args)
+                     2 -> return $ ForArg2 (args !! 0) (args !! 1)
+                     3 -> return $ ForArg3 (args !! 0) (args !! 1) (args !! 2)
+                     _ -> fail "Wrong number of arguments to FOR"
 
 
 parseHa :: Parser Command
@@ -198,13 +211,18 @@ parseQuit = do stringOrPrefix1 "quit"
 
 parseRead :: Parser Command
 parseRead = do stringOrPrefix1 "read"
-               error "No parser for READ"
+               cond <- postCondition
+               char ' '
+               args <- mlist1 parseWriteArg
+               case last args of
+                 WriteExpression (ExpVn vn) -> return $ Read cond (init args) vn
+                 _ -> fail "last argument to READ must be a variable name"
+
 
 
 parseSet :: Parser Command
 parseSet = do stringOrPrefix1 "set"
-              char ' '
-              return Set `ap` postCondition `ap` mlist1 setArg
+              return Set `ap` postCondition `ap` (char ' ' >> mlist1 setArg)
  where setArg = do lhs <- arglist1 parseVn <|> liftM (\x->[x]) parseVn
                    char '='
                    rhs <- parseExp
@@ -377,10 +395,11 @@ parseVn = (do char '@'
               name <- litName <|> return ""
               args <- arglist parseExp
               return $ Gvn name args)
-      <|> (do name <- litName
-              args <- arglist parseExp
-              return $ Lvn name args)
+      <|> parseLvn
       <?> "variable name"
+
+parseLvn :: Parser Vn
+parseLvn = return Lvn `ap` litName `ap` arglist parseExp
 
 -- |Parses a literal name.
 litName :: Parser Name
@@ -405,6 +424,13 @@ mlist1 pa = do
               xs <- (do char ','
                         mlist pa) <|> return []
               return (x:xs)
+
+colonlist :: Parser a -> Parser [a]
+colonlist pa = do x <- pa
+                  xs <- many (char ':' >> pa)
+                  return (x:xs)
+                            
+
 
 -- |Given a parser, parse a comma separated list of these surrounded by parens
 arglist :: Parser a -> Parser [a]
