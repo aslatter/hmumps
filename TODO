@@ -19,10 +19,5 @@ LineAST:
 	indication that the whole GotoArg is indirect, when
 	in fact it's just the label.
 
-	A lot of the parsers for indirection use
-	parseExp (the full on expression parser) when, by the spec,
-	they should be using parseExpAtom.
-	Example
-	> g @place+12^routine
-	should interpret the "+12" as an offset, not part of the
-	expression used in the indirection.
+	The built-in-function parser/data model is just wrong.  It won't
+	work with $s, for example.
