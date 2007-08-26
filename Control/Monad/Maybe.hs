@@ -1,7 +1,8 @@
-{-# OPTIONS_GHC -fglasgow-exts  -fallow-undecidable-instances #-}
+{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances -Wall -Werror #-}
  
 module Control.Monad.Maybe
-  (MaybeT(runMaybeT),
+  (runMaybeT,
+   MaybeT,
    module Control.Monad,
    module Control.Monad.Trans)
 where
@@ -12,7 +13,9 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Writer
  
-newtype MaybeT m a = MaybeT {runMaybeT :: m (Maybe a)}
+newtype MaybeT m a = MaybeT {runMaybeT :: m (Maybe a) -- ^Pulls a monadic value out
+-- from under the MaybeT monad transformer.
+                             }
  
 instance Functor m => Functor (MaybeT m) where
   fmap f x = MaybeT $ fmap (fmap f) $ runMaybeT x
