@@ -11,10 +11,12 @@ module HMumps.Parsers (
              parseCommands,
              command,
              parseExp,
+             parseVn,
              mlist,
              mlist1,
              arglist,
-             arglist1
+             arglist1,
+             parse
                       ) where
 
 import Data.MValue
