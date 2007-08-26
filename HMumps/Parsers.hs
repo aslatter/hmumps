@@ -123,13 +123,15 @@ parseElse = do
 
 parseFor :: Parser Command
 parseFor = do stringOrPrefix1 "for"
-              (do char ' ' 
-                  vn <- parseLvn
-                  char '='
-                  arg <- forArg
-                  return $ For vn arg)
-               <|> (do eof <|> (char ' ' >> (eof <|> (char ' ' >> return ())))
-                       return ForInf)                       
+              (eof >> return ForInf)
+               <|>
+                (do char ' '
+                    (do vn <- parseLvn
+                        char '='
+                        arg <- forArg
+                        return $ For vn arg)
+                      <|> (do eof <|> (char ' ' >> return ())
+                              return ForInf))
 
  where forArg :: Parser ForArg
        forArg = do args <- colonlist parseExp
