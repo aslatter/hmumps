@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts -Wall -Werror #-}
+{-# OPTIONS -fglasgow-exts -Wall -Werror -fth #-}
 
 module HMumps.Runtime where
 
@@ -8,6 +8,7 @@ import qualified Prelude as P
 import Data.Map
 import Data.MValue
 import Data.MArray
+import Data.Accessor
 
 import qualified HMumps.SyntaxTree as M
 import HMumps.SyntaxTree
@@ -19,10 +20,23 @@ import Control.Monad.Maybe
 type Routine = Map String [Line]
 type Line    = (Int, [M.Command])
 
-data RunState = RunState {env       :: Env,
-                          linelevel :: Int,
-                          tags      :: Routine,
-                          stack     :: Maybe RunState}
+data RunState = RunState {env_       :: Env,
+                          linelevel_ :: Int,
+                          tags_      :: Routine,
+                          stack_     :: Maybe RunState}
+
+env :: Accessor RunState Env
+env = $(mkAccessor env_)
+
+linelevel :: Accessor RunState Int
+linelevel = $(mkAccessor linelevel_)
+
+tags :: Accessor RunState Routine
+tags = $(mkAccessor tags_)
+
+stack :: Accessor RunState (Maybe RunState)
+stack = $(mkAccessor stack_)
+
 
 emptyState :: RunState
 emptyState = RunState (NormalFrame empty) 0 empty Nothing
@@ -40,7 +54,7 @@ fetch' label = do result <- runMaybeT $ fetch label
 
 -- |Given the name of a local, returns the corresponding MArray or fails.
 fetch :: MonadState RunState m => String -> m MArray
-fetch label = do ev <- env `liftM` get
+fetch label = do ev <- getA env
                  case ev of
                    NoFrame -> lookback
                    NormalFrame m -> case label `lookup` m of
@@ -51,27 +65,24 @@ fetch label = do ev <- env `liftM` get
                                       Just Nothing -> lookback
                                       Just (Just ma) -> return ma
  where lookback :: MonadState RunState m => m MArray
-       lookback = do Just rs <- stack `liftM` get
+       lookback = do Just rs <- getA stack
                      return $ evalState (fetch label) rs
 
 -- |Given the name of a local, sets it to the given MArray.  May fail if the bottom of the stack doesn't
 -- have a symbol table.
 set :: MonadState RunState m => String -> MArray -> m ()
-set label ma = do ev <- env `liftM` get
+set label ma = do ev <- getA env
                   case ev of
                     NoFrame -> lookback
                     NormalFrame m -> case label `member` m of
                                        False -> lookback
-                                       True  -> do state <- get
-                                                   put $ state {env= NormalFrame (insert label ma m)}
+                                       True  -> putA env (NormalFrame (insert label ma m))
                     StopFrame m -> case label `lookup` m of
                                      Just Nothing -> lookback
-                                     _ -> do state <- get
-                                             put state {env= StopFrame (insert label (Just ma) m)}
+                                     _ -> putA env (StopFrame (insert label (Just ma) m))
  where lookback :: MonadState RunState m => m ()
-       lookback = do state <- get
-                     let Just rs = stack state
-                     put $ state {stack= Just (execState (set label ma) rs)}
+       lookback = do Just rs <- getA stack
+                     putA stack (Just (execState (set label ma) rs))
 
 eval :: MonadState RunState m => M.Expression -> m MValue
 eval (ExpLit m) = m
@@ -85,7 +96,7 @@ eval (ExpVn vn) = case vn of
                                               let String str = mString result
                                               case parse parseVn "Indirect VN" str of
                                                 Right (Lvn label subs') -> eval $ ExpVn $ Lvn label (subs' ++ subs)
-                                                Right (Gvn label subs') -> eval $ ExpVn $ Gvn laebl (subs' ++ subs)
+                                                Right (Gvn label subs') -> eval $ ExpVn $ Gvn label (subs' ++ subs)
                                                 Right (IndirectVn exp' subs') -> eval $ ExpVn $ IndirectVn exp (subs' ++ subs)
                                                 Left err -> fail . show err
 eval (ExpUnop unop expr) = do mv <- eval expr
@@ -113,5 +124,3 @@ eval (ExpBinop binop lexp rexp)
         Follows     -> lv `follows` rv
         Contains    -> lv `contains` rv
         SortsAfter  -> lv > rv
-                               
-                                      

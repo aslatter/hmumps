@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror #-}
+{-# OPTIONS -Wall -fglasgow-exts #-}
 
 -- |This module defines the basic MUMPS type: the MValue
 module Data.MValue where
@@ -7,6 +7,7 @@ module Data.MValue where
 -- aslatter@gmail.com
 
 import Char
+import Data.Ratio
 
 -- The MUMPS value type - is transparently a string or int
 -- or float.
@@ -97,3 +98,121 @@ isNum :: MValue -> Bool
 isNum (Number _) = True
 isNum (Float  _) = True
 isNum mv = mv == mNum mv
+
+
+mNot :: MValue -> MValue
+mNot (Number 0) = 1
+mNot (Number _) = 0
+mNot (Float 0)  = 1
+mNot (Float _)  = 0
+mNot other      = (mNot . mNum) other
+
+mPlus :: MValue -> MValue
+mPlus = mNum
+
+mMinus :: MValue -> MValue
+mMinus x = 0 - (mNum x)
+
+mConcat :: MValue -> MValue -> MValue
+mConcat (String left) (String right) = String $ left ++ right
+mConcat l@(String _) r = l `mConcat` (mString r)
+mConcat l r@(String _) = (mString l) `mConcat` r
+mConcat l r = (mString l) `mConcat` (mString r)
+
+mToBool :: MValue -> Bool
+mToBool s@(String _) = (mToBool . mNum) s
+mToBool (Number 0)   = False
+mToBool (Number _)   = True
+mToBool (Float 0)    = False
+mToBool (Float _)    = True
+
+boolToM :: Bool -> MValue
+boolToM True  = Number 1
+boolToM False = Number 0
+
+mAnd :: MValue -> MValue -> MValue
+mAnd l r = boolToM $ (mToBool l) && (mToBool r)
+
+mOr :: MValue -> MValue -> MValue
+mOr l r  = boolToM $ (mToBool l) || (mToBool r)
+
+mEqual :: MValue -> MValue -> MValue
+mEqual l r = boolToM $ l == r
+
+mLT :: MValue -> MValue -> MValue
+mLT (String l) (String r) = boolToM $ l < r
+mLT (String l) r = let String r' = mString r
+                    in boolToM $ l < r'
+mLT l (String r) = let String l' = mString l
+                    in boolToM $ l' < r
+mLT l r = let String l' = mString l
+              String r' = mString r
+           in boolToM $ l' < r'
+
+mGT :: MValue -> MValue -> MValue
+mGT (String l) (String r) = boolToM $ l > r
+mGT (String l) r = let String r' = mString r
+                    in boolToM $ l > r'
+mGT l (String r) = let String l' = mString l
+                    in boolToM $ l' > r
+mGT l r = let String l' = mString l
+              String r' = mString r
+           in boolToM $ l' > r'
+
+mNumBinop :: (forall a . Num a => a -> a -> a) -> (MValue -> MValue -> MValue)
+mNumBinop op (Number a) (Number b)   = Number $ a `op` b
+mNumBinop op (Float a)  (Number b)   = Float  $ a `op` (fromIntegral b)
+mNumBinop op (Number a) (Float b)    = Float  $ (fromIntegral a) `op` b
+mNumBinop op (Float a)  (Float b)    = Float  $ a `op` b
+mNumBinop op l@(String _) r@(String _) = (mNum l) `op` (mNum r)
+mNumBinop op l@(String _) r            = (mNum l) `op` r
+mNumBinop op l r@(String _)            = l `op` (mNum r)
+
+instance Num MValue where
+    a + b = mNumBinop (+) a b
+    a - b = mNumBinop (-) a b
+    a * b = mNumBinop (*) a b
+
+    negate = mMinus
+
+    abs (Float f)    = Float  $ abs f
+    abs (Number n)   = Number $ abs n
+    abs s@(String _) = abs $ mNum s
+
+    signum (Float f)    = Number $ (floor . signum) f
+    signum (Number n)   = Number $ signum n
+    signum s@(String _) = signum $ mNum s
+
+    fromInteger = Number . fromIntegral
+
+instance Real MValue where
+    toRational s@(String _) = (toRational . mNum) s
+    toRational (Number n)   = toRational n
+    toRational (Float f)    = toRational f
+
+
+instance Fractional MValue where
+    fromRational a | denominator a == 1 = Number $ numerator a
+                   | otherwise          = Float  $ fromRational a
+
+    recip m@(Number 1) = m
+    recip (Number n)   = Float $ 1/(fromIntegral n)
+    recip (Float f)    = Float $ 1/f
+    recip m@(String _) = recip $ mNum m
+
+mRealFracOp :: (forall a . RealFrac a => a -> b) -> MValue -> b
+mRealFracOp op m@(String _) = (op . mNum) m
+mRealFracOp op (Number n)   = op . fromIntegral $ n
+mRealFracOp op (Float f)    = op f
+
+instance RealFrac MValue where
+    properFraction m@(String _) = (properFraction . mNum) m
+    properFraction (Number n)   = (fromIntegral n, 0)
+    properFraction (Float f)    = let (a,b) = properFraction f in
+                                  (a, Float b)
+
+    truncate       = mRealFracOp truncate
+    round          = mRealFracOp round
+    ceiling        = mRealFracOp ceiling
+    floor          = mRealFracOp floor
+
