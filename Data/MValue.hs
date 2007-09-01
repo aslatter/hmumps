@@ -271,12 +271,14 @@ instance Floating MValue where
     (**)    = mFloatBinop (**)
     logBase = mFloatBinop logBase
 
+mQuot :: MValue -> MValue -> MValue
 mQuot (Number n1) (Number n2) = Number $ quot n1 n2
 mQuot (Float f1) mv   = mQuot (Number . truncate $ f1) mv
 mQuot mv (Float f2)   = mQuot mv (Number . truncate $ f2)
 mQuot s@(String _) mv = mQuot (mNum s) mv
 mQuot mv s@(String _) = mQuot mv (mNum s)
 
+mRem :: MValue -> MValue -> MValue
 mRem (Number n1) (Number n2) = Number $ rem n1 n2
 mRem (Float f1) mv   = mRem (Number . truncate $ f1) mv
 mRem mv (Float f2)   = mRem mv (Number . truncate $ f2)
