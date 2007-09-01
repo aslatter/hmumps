@@ -8,6 +8,7 @@ module Data.MValue where
 
 import Char
 import Data.Ratio
+import qualified Data.List as L
 
 -- The MUMPS value type - is transparently a string or int
 -- or float.
@@ -29,7 +30,7 @@ data MValue = String String
 -- to the "canonical" numeric form before being
 -- represented as a string.
 instance Eq MValue where
-    v1 == v2 = meq v1 v2
+    (==) = meq
         where
           meq :: MValue -> MValue -> Bool
           -- Easy cases
@@ -59,8 +60,29 @@ instance Ord MValue where
     compare (String s1) mv = let (String s2) = mString mv in compare s1 s2
     compare mv (String s2) = let (String s1) = mString mv in compare s1 s2
 
+follows :: MValue -> MValue -> MValue
+follows a b = boolToM $ follows' a b
+ where follows' :: MValue -> MValue -> Bool
+       follows' (String l) (String r) = l > r
+       follows' (String l) r = let String r' = mString r
+                               in l > r'
+       follows' l (String r) = let String l' = mString l
+                               in l' > r
+       follows' l r = let String l' = mString l
+                          String r' = mString r
+                      in l' > r'
 
--- |Cast to String - the returned MValue is always built witht the String
+contains :: MValue -> MValue -> MValue
+contains a b = boolToM $ contains' a b
+ where contains' :: MValue -> MValue -> Bool
+       contains' (String s1) (String s2) = s2 `L.isInfixOf` s1
+       contains' (String s1) mv          = let String s2 = mString mv
+                                           in s2 `L.isInfixOf` s1
+       contains' mv (String s2)          = let String s1 = mString mv
+                                           in s2 `L.isInfixOf` s1
+       contains' mv1 mv2                 = contains' (mString mv1) (mString mv2)
+
+-- |Cast to String - the returned MValue is always built with the String
 -- constructor.
 mString :: MValue -> MValue
 mString (Number n)   = String $ show n
@@ -101,17 +123,13 @@ isNum mv = mv == mNum mv
 
 
 mNot :: MValue -> MValue
-mNot (Number 0) = 1
-mNot (Number _) = 0
-mNot (Float 0)  = 1
-mNot (Float _)  = 0
-mNot other      = (mNot . mNum) other
+mNot = boolToM . not . mToBool
 
 mPlus :: MValue -> MValue
 mPlus = mNum
 
 mMinus :: MValue -> MValue
-mMinus x = 0 - (mNum x)
+mMinus x = -x
 
 mConcat :: MValue -> MValue -> MValue
 mConcat (String left) (String right) = String $ left ++ right
@@ -164,16 +182,17 @@ mNumBinop op (Number a) (Number b)   = Number $ a `op` b
 mNumBinop op (Float a)  (Number b)   = Float  $ a `op` (fromIntegral b)
 mNumBinop op (Number a) (Float b)    = Float  $ (fromIntegral a) `op` b
 mNumBinop op (Float a)  (Float b)    = Float  $ a `op` b
-mNumBinop op l@(String _) r@(String _) = (mNum l) `op` (mNum r)
 mNumBinop op l@(String _) r            = (mNum l) `op` r
 mNumBinop op l r@(String _)            = l `op` (mNum r)
 
 instance Num MValue where
-    a + b = mNumBinop (+) a b
-    a - b = mNumBinop (-) a b
-    a * b = mNumBinop (*) a b
+    (+) = mNumBinop (+)
+    (-) = mNumBinop (-)
+    (*) = mNumBinop (*)
 
-    negate = mMinus
+    negate (Number n)   = Number (-n)
+    negate (Float f)    = Float  (-f)
+    negate s@(String _) = negate . mNum $ s
 
     abs (Float f)    = Float  $ abs f
     abs (Number n)   = Number $ abs n
@@ -216,3 +235,50 @@ instance RealFrac MValue where
     ceiling        = mRealFracOp ceiling
     floor          = mRealFracOp floor
 
+mFloatUnop :: (forall a . Floating a => a -> a) -> (MValue -> MValue)
+mFloatUnop op (Float f)    = Float $ op f
+mFloatUnop op (Number n)   = Float . op $ fromIntegral n
+mFloatUnop op s@(String _) = op . mNum $ s
+
+mFloatBinop :: (forall a . Floating a => a -> a -> a)
+               -> (MValue -> MValue -> MValue)
+mFloatBinop op (Float f1) (Float f2)   = Float $ f1 `op` f2
+mFloatBinop op (Float f1) (Number n2)  = Float $ f1 `op` (fromIntegral n2)
+mFloatBinop op (Number n1) (Float f2)  = Float $ (fromIntegral n1) `op` f2
+mFloatBinop op (Number n1) (Number n2) = Float $ (fromIntegral n1) `op` (fromIntegral n2)
+mFloatBinop op s@(String _) mv         = (mNum s) `op` mv
+mFloatBinop op mv s@(String _)         = mv `op` (mNum s)
+
+instance Floating MValue where
+    pi = Float pi
+
+    exp   = mFloatUnop exp
+    log   = mFloatUnop log
+    sqrt  = mFloatUnop sqrt
+    sin   = mFloatUnop sin
+    cos   = mFloatUnop cos
+    tan   = mFloatUnop tan
+    asin  = mFloatUnop asin
+    acos  = mFloatUnop acos
+    atan  = mFloatUnop atan
+    sinh  = mFloatUnop sinh
+    cosh  = mFloatUnop cosh
+    tanh  = mFloatUnop tanh
+    asinh = mFloatUnop asinh
+    acosh = mFloatUnop acosh
+    atanh = mFloatUnop atanh
+
+    (**)    = mFloatBinop (**)
+    logBase = mFloatBinop logBase
+
+mQuot (Number n1) (Number n2) = Number $ quot n1 n2
+mQuot (Float f1) mv   = mQuot (Number . truncate $ f1) mv
+mQuot mv (Float f2)   = mQuot mv (Number . truncate $ f2)
+mQuot s@(String _) mv = mQuot (mNum s) mv
+mQuot mv s@(String _) = mQuot mv (mNum s)
+
+mRem (Number n1) (Number n2) = Number $ rem n1 n2
+mRem (Float f1) mv   = mRem (Number . truncate $ f1) mv
+mRem mv (Float f2)   = mRem mv (Number . truncate $ f2)
+mRem s@(String _) mv = mRem (mNum s) mv
+mRem mv s@(String _) = mRem mv (mNum s)

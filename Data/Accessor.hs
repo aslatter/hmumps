@@ -1,17 +1,16 @@
-{-# OPTIONS -fglasgow-exts -fth#-}
+{-# OPTIONS -fglasgow-exts -Wall -Werror #-}
 
 module Data.Accessor
  (Accessor(Accessor),
   getVal,
   setVal,
+  (@.),
   getA,
   putA,
   modA,
-  at,
-  mkAccessor) where
+  at) where
 
 import Control.Monad.State
-import Language.Haskell.TH
 
 data Accessor s a = 
      Accessor { getVal :: s -> a
@@ -36,9 +35,3 @@ modA acc f = do
 
 at :: Int -> Accessor [a] a
 at n = Accessor (!! n) (\x a -> take n a ++ [x] ++ drop (n+1) a)
-
-mkAccessor f = do x <- newName "x"
-                  s <- newName "s"
-                  con <- [| Accessor |]
-                  VarE fun <- [| f |]
-                  return $ AppE (AppE (con) (VarE fun)) (LamE [VarP x,VarP s] (RecUpdE (VarE s) [(fun,VarE x)]))

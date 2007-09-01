@@ -1,4 +1,6 @@
-{-# OPTIONS -fglasgow-exts -Wall -Werror -fth #-}
+{-# OPTIONS -fglasgow-exts -Wall -Werror -cpp #-}
+
+#define MK_ACCESSOR(f) (Accessor f (\x s -> s {f = x}))
 
 module HMumps.Runtime where
 
@@ -26,16 +28,16 @@ data RunState = RunState {env_       :: Env,
                           stack_     :: Maybe RunState}
 
 env :: Accessor RunState Env
-env = $(mkAccessor env_)
+env = MK_ACCESSOR(env_)
 
 linelevel :: Accessor RunState Int
-linelevel = $(mkAccessor linelevel_)
+linelevel = MK_ACCESSOR(linelevel_)
 
 tags :: Accessor RunState Routine
-tags = $(mkAccessor tags_)
+tags = MK_ACCESSOR(tags_)
 
 stack :: Accessor RunState (Maybe RunState)
-stack = $(mkAccessor stack_)
+stack = MK_ACCESSOR(stack_)
 
 
 emptyState :: RunState
@@ -85,20 +87,21 @@ set label ma = do ev <- getA env
                      putA stack (Just (execState (set label ma) rs))
 
 eval :: MonadState RunState m => M.Expression -> m MValue
-eval (ExpLit m) = m
+eval (ExpLit m) = return m
 eval (ExpVn vn) = case vn of
                     Lvn label subs -> do ma <- fetch' label
-                                         case mIndex ma subs of
+                                         mvs <- mapM eval subs
+                                         case mIndex ma mvs of
                                            Just mv -> return mv
                                            Nothing -> return $ String ""
                     Gvn _ _ -> fail "Globals not yet implemented"
-                    IndirectVn exp subs -> do result <- eval exp
-                                              let String str = mString result
-                                              case parse parseVn "Indirect VN" str of
-                                                Right (Lvn label subs') -> eval $ ExpVn $ Lvn label (subs' ++ subs)
-                                                Right (Gvn label subs') -> eval $ ExpVn $ Gvn label (subs' ++ subs)
-                                                Right (IndirectVn exp' subs') -> eval $ ExpVn $ IndirectVn exp (subs' ++ subs)
-                                                Left err -> fail . show err
+                    IndirectVn expr subs -> do result <- eval expr
+                                               let String str = mString result
+                                               case parse parseVn "Indirect VN" str of
+                                                 Right (Lvn label subs') -> eval $ ExpVn $ Lvn label (subs' ++ subs)
+                                                 Right (Gvn label subs') -> eval $ ExpVn $ Gvn label (subs' ++ subs)
+                                                 Right (IndirectVn expr' subs') -> eval $ ExpVn $ IndirectVn expr' (subs' ++ subs)
+                                                 Left err -> fail . show $ err
 eval (ExpUnop unop expr) = do mv <- eval expr
                               return $ case unop of
                                 UNot   -> mNot   mv
@@ -113,9 +116,9 @@ eval (ExpBinop binop lexp rexp)
         Sub         -> lv - rv
         Mult        -> lv * rv
         Div         -> lv / rv
-        Rem         -> lv `rem` rv
-        Quot        -> lv `quot` rv
-        Pow         -> lv ^ rv
+        Rem         -> lv `mRem` rv
+        Quot        -> lv `mQuot` rv
+        Pow         -> lv ** rv
         And         -> lv `mAnd` rv
         Or          -> lv `mOr` rv
         Equal       -> lv `mEqual` rv
@@ -123,4 +126,8 @@ eval (ExpBinop binop lexp rexp)
         GreaterThan -> lv `mGT` rv
         Follows     -> lv `follows` rv
         Contains    -> lv `contains` rv
-        SortsAfter  -> lv > rv
+        SortsAfter  -> boolToM $ lv > rv
+eval (Pattern _ _)   = undefined
+eval (FunCall _ _ _) = undefined
+eval (BIFCall _ _)   = undefined
+
