@@ -121,15 +121,8 @@ isNum (Number _) = True
 isNum (Float  _) = True
 isNum mv = mv == mNum mv
 
-
 mNot :: MValue -> MValue
 mNot = boolToM . not . mToBool
-
-mPlus :: MValue -> MValue
-mPlus = mNum
-
-mMinus :: MValue -> MValue
-mMinus x = -x
 
 mConcat :: MValue -> MValue -> MValue
 mConcat (String left) (String right) = String $ left ++ right

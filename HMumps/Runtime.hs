@@ -12,7 +12,6 @@ import Data.MValue
 import Data.MArray
 import Data.Accessor
 
-import qualified HMumps.SyntaxTree as M
 import HMumps.SyntaxTree
 import HMumps.Parsers
 
@@ -20,7 +19,7 @@ import Control.Monad.State
 import Control.Monad.Maybe
 
 type Routine = Map String [Line]
-type Line    = (Int, [M.Command])
+type Line    = (Int, [Command])
 
 data RunState = RunState {env_       :: Env,
                           linelevel_ :: Int,
@@ -86,7 +85,8 @@ set label ma = do ev <- getA env
        lookback = do Just rs <- getA stack
                      putA stack (Just (execState (set label ma) rs))
 
-eval :: MonadState RunState m => M.Expression -> m MValue
+
+eval :: MonadState RunState m => Expression -> m MValue
 eval (ExpLit m) = return m
 eval (ExpVn vn) = case vn of
                     Lvn label subs -> do ma <- fetch' label
@@ -105,8 +105,8 @@ eval (ExpVn vn) = case vn of
 eval (ExpUnop unop expr) = do mv <- eval expr
                               return $ case unop of
                                 UNot   -> mNot   mv
-                                UPlus  -> mPlus  mv
-                                UMinus -> mMinus mv
+                                UPlus  -> mNum   mv
+                                UMinus -> negate mv
 eval (ExpBinop binop lexp rexp) 
  = do lv <- eval lexp
       rv <- eval rexp
@@ -127,7 +127,7 @@ eval (ExpBinop binop lexp rexp)
         Follows     -> lv `follows` rv
         Contains    -> lv `contains` rv
         SortsAfter  -> boolToM $ lv > rv
-eval (Pattern _ _)   = undefined
-eval (FunCall _ _ _) = undefined
-eval (BIFCall _ _)   = undefined
+eval (Pattern _ _)   = fail "Can't evaluate pattern matches"
+eval (FunCall _ _ _) = fail "Can't evaluate function calls"
+eval (BIFCall _ _)   = fail "Can't evaluate built-in function calls"
 
