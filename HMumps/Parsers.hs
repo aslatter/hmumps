@@ -234,8 +234,7 @@ parseSet = do stringOrPrefix1 "set"
 
 parseWrite :: Parser Command
 parseWrite = do stringOrPrefix1 "write"
-                char ' '
-                return Write `ap` postCondition `ap` mlist1 parseWriteArg
+                return Write `ap` postCondition `ap` (char ' ' >> mlist1 parseWriteArg)
 
 parseWriteArg :: Parser WriteArg
 parseWriteArg = (WriteFormat `liftM` many1 parseWriteFormatCode)
