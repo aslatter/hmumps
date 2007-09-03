@@ -1,4 +1,6 @@
-{-# OPTIONS -Wall -fglasgow-exts #-}
+{-# OPTIONS -Wall
+            -fglasgow-exts
+  #-}
 
 -- |This module defines the basic MUMPS type: the MValue
 module Data.MValue where
@@ -175,8 +177,8 @@ mNumBinop op (Number a) (Number b)   = Number $ a `op` b
 mNumBinop op (Float a)  (Number b)   = Float  $ a `op` (fromIntegral b)
 mNumBinop op (Number a) (Float b)    = Float  $ (fromIntegral a) `op` b
 mNumBinop op (Float a)  (Float b)    = Float  $ a `op` b
-mNumBinop op l@(String _) r            = (mNum l) `op` r
-mNumBinop op l r@(String _)            = l `op` (mNum r)
+mNumBinop op l@(String _) r          = (mNum l) `op` r
+mNumBinop op l r@(String _)          = l `op` (mNum r)
 
 instance Num MValue where
     (+) = mNumBinop (+)
@@ -191,7 +193,7 @@ instance Num MValue where
     abs (Number n)   = Number $ abs n
     abs s@(String _) = abs $ mNum s
 
-    signum (Float f)    = Number $ (floor . signum) f
+    signum (Float f)    = Number $ truncate $ signum f
     signum (Number n)   = Number $ signum n
     signum s@(String _) = signum $ mNum s
 
@@ -205,7 +207,7 @@ instance Real MValue where
 
 instance Fractional MValue where
     fromRational a | denominator a == 1 = Number $ numerator a
-                   | otherwise          = Float  $ fromRational a
+                   | True               = Float  $ fromRational a
 
     recip m@(Number 1) = m
     recip (Number n)   = Float $ 1/(fromIntegral n)
@@ -223,10 +225,10 @@ instance RealFrac MValue where
     properFraction (Float f)    = let (a,b) = properFraction f in
                                   (a, Float b)
 
-    truncate       = mRealFracOp truncate
-    round          = mRealFracOp round
-    ceiling        = mRealFracOp ceiling
-    floor          = mRealFracOp floor
+    truncate  = mRealFracOp truncate
+    round     = mRealFracOp round
+    ceiling   = mRealFracOp ceiling
+    floor     = mRealFracOp floor
 
 mFloatUnop :: (forall a . Floating a => a -> a) -> (MValue -> MValue)
 mFloatUnop op (Float f)    = Float $ op f
