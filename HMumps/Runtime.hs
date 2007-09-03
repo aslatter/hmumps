@@ -1,6 +1,6 @@
 {-# OPTIONS -fglasgow-exts -Wall -Werror -cpp #-}
 
-#define MK_ACCESSOR(f) (Accessor f (\x s -> s {f = x}))
+-- #define ACCESSOR(f) (Accessor f (\x s -> s {f = x}))
 
 module HMumps.Runtime where
 
@@ -10,7 +10,6 @@ import qualified Prelude as P
 import Data.Map
 import Data.MValue
 import Data.MArray
-import Data.Accessor
 
 import HMumps.SyntaxTree
 import HMumps.Parsers
@@ -21,72 +20,61 @@ import Control.Monad.Maybe
 type Routine = Map String [Line]
 type Line    = (Int, [Command])
 
-data RunState = RunState {env_       :: Env,
-                          linelevel_ :: Int,
-                          tags_      :: Routine,
-                          stack_     :: Maybe RunState}
+data RunState = RunState {env       :: Env,
+                          linelevel :: Int,
+                          tags      :: Routine}
 
-env :: Accessor RunState Env
-env = MK_ACCESSOR(env_)
-
-linelevel :: Accessor RunState Int
-linelevel = MK_ACCESSOR(linelevel_)
-
-tags :: Accessor RunState Routine
-tags = MK_ACCESSOR(tags_)
-
-stack :: Accessor RunState (Maybe RunState)
-stack = MK_ACCESSOR(stack_)
-
-
-emptyState :: RunState
-emptyState = RunState (NormalFrame empty) 0 empty Nothing
+emptyState :: [RunState]
+emptyState = [RunState NoFrame 0 empty]
 
 data Env = NoFrame
          | NormalFrame (Map String MArray)
          | StopFrame (Map String (Maybe MArray))
 
--- |A wrapper around fetch which will return mEmpty instead of failing.
-fetch' :: MonadState RunState m => String -> m MArray
-fetch' label = do result <- runMaybeT $ fetch label
-                  case result of
-                    Just ma -> return ma
-                    Nothing -> return $ mEmpty
+-- Much nicer than the old one.
+fetch :: String -> [RunState] -> Maybe MArray
+fetch str xs = join $ foldr helper Nothing (P.map (look str . env) xs)
 
--- |Given the name of a local, returns the corresponding MArray or fails.
-fetch :: MonadState RunState m => String -> m MArray
-fetch label = do ev <- getA env
-                 case ev of
-                   NoFrame -> lookback
-                   NormalFrame m -> case label `lookup` m of
-                                      Nothing -> lookback
-                                      Just ma -> return ma
-                   StopFrame m   -> case label `lookup` m of
-                                      Nothing -> fail $ "lookup failed: " ++ label
-                                      Just Nothing -> lookback
-                                      Just (Just ma) -> return ma
- where lookback :: MonadState RunState m => m MArray
-       lookback = do Just rs <- getA stack
-                     return $ evalState (fetch label) rs
+ where helper :: Maybe (Maybe MArray) -> Maybe (Maybe MArray) -> Maybe (Maybe MArray)
+       helper x Nothing      = x
+       helper _ j@(Just _)   = j
 
--- |Given the name of a local, sets it to the given MArray.  May fail if the bottom of the stack doesn't
--- have a symbol table.
-set :: MonadState RunState m => String -> MArray -> m ()
-set label ma = do ev <- getA env
-                  case ev of
-                    NoFrame -> lookback
-                    NormalFrame m -> case label `member` m of
-                                       False -> lookback
-                                       True  -> putA env (NormalFrame (insert label ma m))
-                    StopFrame m -> case label `lookup` m of
-                                     Just Nothing -> lookback
-                                     _ -> putA env (StopFrame (insert label (Just ma) m))
- where lookback :: MonadState RunState m => m ()
-       lookback = do Just rs <- getA stack
-                     putA stack (Just (execState (set label ma) rs))
+look :: String -> Env -> Maybe (Maybe MArray)
+look _ NoFrame = Nothing
+look str (NormalFrame m) = case lookup str m of
+                             Nothing -> Nothing
+                             j       -> Just j
+look str (StopFrame m) = case lookup str m of
+                           Nothing      -> Just Nothing
+                           Just Nothing -> Nothing
+                           x            -> x
+
+fetch' :: MonadState [RunState] m => String -> m MArray
+fetch' str = do result <- (fetch str) `liftM` get
+                case result of
+                  Just x  -> return x
+                  Nothing -> return mEmpty
 
 
-eval :: MonadState RunState m => Expression -> m MValue
+set' :: String -> MArray -> [RunState] -> [RunState]
+set' _ _ []        = error "set called with an empty stack"
+set' str ma (x:[]) = case (env x) of
+                      NoFrame -> x {env = (NormalFrame (insert str ma empty))} : []
+                      NormalFrame m -> x {env = (NormalFrame (insert str ma m))} : []
+                      StopFrame m -> x {env = (StopFrame (insert str (Just ma) m))} : []
+set' str ma (x:xs) = case (look str . env) x of 
+                      Nothing -> x : (set' str ma xs)
+                      Just _ -> case env x of
+                                  NoFrame -> error "something bad happened in Runtime.set"
+                                  NormalFrame m -> x {env = (NormalFrame (insert str ma m))} : xs
+                                  StopFrame m -> x {env = (StopFrame (insert str (Just ma) m))} : xs
+
+set :: MonadState [RunState] m => String -> MArray -> m ()
+set str ma = modify (set' str ma)
+
+
+
+eval :: MonadState [RunState] m => Expression -> m MValue
 eval (ExpLit m) = return m
 eval (ExpVn vn) = case vn of
                     Lvn label subs -> do ma <- fetch' label
