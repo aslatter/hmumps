@@ -1,6 +1,4 @@
-{-# OPTIONS -fglasgow-exts -Wall -Werror -cpp #-}
-
--- #define ACCESSOR(f) (Accessor f (\x s -> s {f = x}))
+{-# OPTIONS -fglasgow-exts -Wall -Werror #-}
 
 module HMumps.Runtime where
 
@@ -30,7 +28,7 @@ data Env = NoFrame
          | NormalFrame (Map String MArray)
          | StopFrame (Map String (Maybe MArray))
 
--- Much nicer than the old one.
+
 fetch :: String -> [RunState] -> Maybe MArray
 fetch str xs = join $ foldr helper Nothing (P.map (look str . env) xs)
 
@@ -48,6 +46,7 @@ look str (StopFrame m) = case lookup str m of
                            Just Nothing -> Nothing
                            x            -> x
 
+-- |Returns the MArray associated with the named local var, or the empty MArray
 fetch' :: MonadState [RunState] m => String -> m MArray
 fetch' str = do result <- (fetch str) `liftM` get
                 case result of
@@ -64,13 +63,17 @@ set' str ma (x:[]) = case (env x) of
 set' str ma (x:xs) = case (look str . env) x of 
                       Nothing -> x : (set' str ma xs)
                       Just _ -> case env x of
-                                  NoFrame -> error "something bad happened in Runtime.set"
+                                  NoFrame -> error "something bad happened in HMumps.Runtime.set"
                                   NormalFrame m -> x {env = (NormalFrame (insert str ma m))} : xs
                                   StopFrame m -> x {env = (StopFrame (insert str (Just ma) m))} : xs
+
 
 set :: MonadState [RunState] m => String -> MArray -> m ()
 set str ma = modify (set' str ma)
 
+
+exec :: MonadState [RunState] m => Line -> m ()
+exec = error "HMumps.Runtime.exec: undefined"
 
 
 eval :: MonadState [RunState] m => Expression -> m MValue

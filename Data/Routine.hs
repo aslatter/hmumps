@@ -6,6 +6,11 @@
 module Data.Routine where
 
 
+import Data.Map
+
+import HMumps.SyntaxTree
+
+
 type Routine = Map String [Line]
 type Line    = [Command]
 type File    = [(Maybe Tag, Line)]

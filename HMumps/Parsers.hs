@@ -16,15 +16,41 @@ module HMumps.Parsers (
              mlist1,
              arglist,
              arglist1,
-             parse
-                      ) where
+             parse,
+             parseFile) where
 
 import Data.MValue
 import HMumps.SyntaxTree
 
+import Data.Monoid
 import Control.Monad
 import Text.ParserCombinators.Parsec
 import Text.Regex
+
+
+parseFile :: String -> [(Maybe String,Int,[Command])]
+parseFile str = map helper (lines str)
+ where helper ('\t' : dotted) = let (lineLevel, line) = splitLineLevel dotted
+                                    commands = undefined line
+                                in (Nothing, lineLevel, commands)
+       helper tagged = let (tag, dotted) = splitTag tagged
+                           (lineLevel, line) = splitLineLevel dotted
+                           commands = undefined line
+                       in (Just tag, lineLevel, commands)
+
+splitLineLevel :: String -> (Int, String)
+splitLineLevel x = let (Sum ll, line) = splitLineLevel' x
+                   in (ll, line)
+
+splitLineLevel' :: String -> (Sum Int, String)
+splitLineLevel' [] = (Sum 0,[])
+splitLineLevel' (' ' : dotted) = splitLineLevel' dotted
+splitLineLevel' ('.' : dotted) = (Sum 1,[]) `mappend` (splitLineLevel' dotted)
+splitLineLevel' x              = (Sum 0,x)
+
+splitTag :: String -> (String, String)
+splitTag = undefined                           
+                       
 
 -- | The "initLex" function takes in a string representing all of the code
 -- to be parsed (say, an entire routine) and:
