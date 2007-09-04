@@ -10,6 +10,7 @@ import qualified Prelude as P
 import Data.Map
 import Data.MValue
 import Data.MArray
+import Data.Routine
 
 import HMumps.SyntaxTree
 import HMumps.Parsers
@@ -17,8 +18,6 @@ import HMumps.Parsers
 import Control.Monad.State
 import Control.Monad.Maybe
 
-type Routine = Map String [Line]
-type Line    = (Int, [Command])
 
 data RunState = RunState {env       :: Env,
                           linelevel :: Int,
