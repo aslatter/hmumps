@@ -8,8 +8,8 @@ import qualified Prelude as P
 import Data.Map
 import Data.MValue
 import Data.MArray
-import Data.Routine
 
+import HMumps.Routine
 import HMumps.SyntaxTree
 import HMumps.Parsers
 

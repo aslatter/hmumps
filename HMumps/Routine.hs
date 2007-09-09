@@ -3,7 +3,7 @@
             -Werror
   #-}
 
-module Data.Routine where
+module HMumps.Routine where
 
 
 import Data.Map
