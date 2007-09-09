@@ -13,11 +13,12 @@ import HMumps.SyntaxTree
 
 type Routine = Map String [Line]
 type Line    = [Command]
-type File    = [(Maybe Tag, Line)]
+type File    = [(Tag, Line)]
+type OldFile = [(Tag, Int, Line)]
 type Tag     = String
 
 -- |After initial parsing, do a pass over each tag to handle things.
-transform :: File -> File
+transform :: OldFile -> File
 transform = undefined
 
 pack :: File -> Routine

@@ -20,6 +20,7 @@ module HMumps.Parsers (
              parseFile) where
 
 import Data.MValue
+import HMumps.Routine
 import HMumps.SyntaxTree
 
 import Control.Monad
@@ -28,7 +29,7 @@ import Text.Regex
 
 
 
-parseFile :: Parser [(String, Int, [Command])]
+parseFile :: Parser OldFile
 parseFile = many $
        do tag <- many $ noneOf "\t\n"
           char '\t'
