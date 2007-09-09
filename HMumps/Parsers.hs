@@ -22,35 +22,20 @@ module HMumps.Parsers (
 import Data.MValue
 import HMumps.SyntaxTree
 
-import Data.Monoid
 import Control.Monad
 import Text.ParserCombinators.Parsec
 import Text.Regex
 
 
-parseFile :: String -> [(Maybe String,Int,[Command])]
-parseFile str = map helper (lines str)
- where helper ('\t' : dotted) = let (lineLevel, line) = splitLineLevel dotted
-                                    commands = undefined line
-                                in (Nothing, lineLevel, commands)
-       helper tagged = let (tag, dotted) = splitTag tagged
-                           (lineLevel, line) = splitLineLevel dotted
-                           commands = undefined line
-                       in (Just tag, lineLevel, commands)
 
-splitLineLevel :: String -> (Int, String)
-splitLineLevel x = let (Sum ll, line) = splitLineLevel' x
-                   in (ll, line)
+parseFile :: Parser [(String, Int, [Command])]
+parseFile = many $
+       do tag <- many $ noneOf "\t\n"
+          char '\t'
+          linelevel <- length `liftM` many (do spaces; x <- char '.'; spaces; return x)
+          cmds <- parseCommands
+          return (tag, linelevel, cmds) 
 
-splitLineLevel' :: String -> (Sum Int, String)
-splitLineLevel' [] = (Sum 0,[])
-splitLineLevel' (' ' : dotted) = splitLineLevel' dotted
-splitLineLevel' ('.' : dotted) = (Sum 1,[]) `mappend` (splitLineLevel' dotted)
-splitLineLevel' x              = (Sum 0,x)
-
-splitTag :: String -> (String, String)
-splitTag = undefined                           
-                       
 
 -- | The "initLex" function takes in a string representing all of the code
 -- to be parsed (say, an entire routine) and:
@@ -70,15 +55,19 @@ parseCommands = do spaces
                    (do x <- command;
                        xs <- parseCommands;
                        return (x:xs)) <|> (do comment;
-                                              return []) <|> (eof >> return [])
+                                              return [])
+                                      <|> (eof >> return [])
+                                      <|> (char '\n' >> return [])
 -- I think I do this wrong, because I'm not sure what happens on
 -- mal-formed input.  anyway, I think it's better than it was.
 
 
--- munch comments
+-- munch comments, including trailing newline (if any)
 comment :: Parser String
 comment = do char ';'
-             many anyChar
+             cmt <- many $ noneOf "\n"
+             (char '\n' >> return ()) <|> return ()
+             return cmt
 
 -- |Parses a single command.
 command :: Parser Command
