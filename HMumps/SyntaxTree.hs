@@ -95,6 +95,8 @@ data Command = Break (Maybe Condition)
              | Read (Maybe Condition) [WriteArg] Vn
              | Set (Maybe Condition) [SetArg]
              | Write (Maybe Condition) [WriteArg]
+             -- The following commands will not have parsers written for them
+             | Nop
  deriving Show
 
 
