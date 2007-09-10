@@ -11,6 +11,8 @@ module Data.MValue where
 import Char
 import Data.Ratio
 import qualified Data.List as L
+import Test.QuickCheck
+
 
 -- The MUMPS value type - is transparently a string or int
 -- or float.
@@ -279,3 +281,36 @@ mRem (Float f1) mv   = mRem (Number . truncate $ f1) mv
 mRem mv (Float f2)   = mRem mv (Number . truncate $ f2)
 mRem s@(String _) mv = mRem (mNum s) mv
 mRem mv s@(String _) = mRem mv (mNum s)
+
+
+instance Arbitrary Char where
+    arbitrary = elements ('%':['A'..'z'])
+    coarbitrary c = variant (fromEnum c `rem` 4)
+
+instance Arbitrary MValue where
+    arbitrary = oneof [do
+                         x <- arbitrary
+                         return $ String x,
+                       do
+                         x <- arbitrary
+                         return $ Number x,
+                       do
+                         x <- arbitrary
+                         return $ Float x]
+    coarbitrary (String s) = variant 0 . coarbitrary s
+    coarbitrary (Number n) = variant 1 . coarbitrary n
+    coarbitrary (Float f) = variant 2 . coarbitrary f
+
+
+testStringCast mv = mString mv == mv
+      where types = mv :: MValue
+
+testNumericCast f = Number f == (mNum . mString . Number) f
+      where types = f :: Integer
+
+
+-- Displayed whole numbers should not have trailing zeros.  This is a check
+-- on that.
+testTrailingZero n = (mString . Number) n == (mString . Float . fromIntegral) n
+      where types = n :: Integer
+

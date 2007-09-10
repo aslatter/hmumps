@@ -8,6 +8,7 @@ import Control.Monad
 import Text.ParserCombinators.Parsec
 import System.IO
 import System.Console.Readline -- Note, uses GNU readline, under GPL
+import Data.MArray
 
 main :: IO ()
 main = hSetBuffering stdout NoBuffering >> putStrLn splash >> loop 

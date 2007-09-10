@@ -14,6 +14,7 @@ module Data.MArray (
 import Data.Map
 import Data.MValue
 import Prelude hiding (lookup,null)
+import Test.QuickCheck
 
 data MArray = MArray (Maybe MValue) (Map MValue MArray)
 
@@ -69,3 +70,19 @@ order (MArray _ map') forward (mv:[]) = let (map1, map2) = split mv map' in
 order (MArray _ map') forward (mv:ms) = do vc <- lookup mv map'
                                            order vc forward ms
 order _ _ [] = undefined -- some sort of base case.  this function is all messed up :-(
+
+
+instance (Arbitrary a) => Arbitrary (Maybe a) where
+    arbitrary            = sized arbMaybe
+        where
+          arbMaybe 0 = return Nothing
+          arbMaybe n = fmap Just (resize (n-1) arbitrary)
+    coarbitrary Nothing  = variant 0
+    coarbitrary (Just x) = variant 1 . coarbitrary x
+
+instance Arbitrary MArray where
+    arbitrary = do
+      n <- arbitrary
+      xs <- arbitrary
+      return $ MArray n (fromList xs)
+    coarbitrary (MArray n xs) = variant 0 . coarbitrary (n,toList xs)
