@@ -73,7 +73,19 @@ set str ma = modify (set' str ma)
 
 
 exec :: MonadState [RunState] m => Line -> m ()
-exec = error "HMumps.Runtime.exec: undefined"
+exec []  = return ()
+exec (Nop:cmds) = exec cmds
+exec (ForInf:cmds) = forInf (repeat cmds)
+
+
+forInf ((Quit cond Nothing):xs) = case cond of
+    Nothing  -> return ()
+    Just exp -> do mv <- eval exp
+                   if mToBool mv
+                    then return ()
+                    else forInf xs
+forInf ((Quit _ _):_) = fail "QUIT with argument in a for loop"
+forInf (cmd:xs) = exec cmd >> forInf xs
 
 
 eval :: MonadState [RunState] m => Expression -> m MValue
