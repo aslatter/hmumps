@@ -83,7 +83,7 @@ exec ((Break cond):cmds) = case cond of
                     then break
                     else exec cmds
 exec (Else:cmds) = do t <- test
-                      if test
+                      if t
                        then exec cmds
                        else return ()
 
