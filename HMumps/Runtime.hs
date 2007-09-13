@@ -75,7 +75,17 @@ set str ma = modify (set' str ma)
 exec :: MonadState [RunState] m => Line -> m ()
 exec []  = return ()
 exec (Nop:cmds) = exec cmds
-exec (ForInf:cmds) = forInf (repeat cmds)
+exec (ForInf:cmds) = forInf (cycle cmds)
+exec ((Break cond):cmds) = case cond of
+    Nothing -> break
+    Just exp -> do mv <- eval exp
+                   if mToBool mv
+                    then break
+                    else exec cmds
+exec (Else:cmds) = do t <- test
+                      if test
+                       then exec cmds
+                       else return ()
 
 
 forInf ((Quit cond Nothing):xs) = case cond of
@@ -87,6 +97,11 @@ forInf ((Quit cond Nothing):xs) = case cond of
 forInf ((Quit _ _):_) = fail "QUIT with argument in a for loop"
 forInf (cmd:xs) = exec cmd >> forInf xs
 
+break = undefined -- ^will someday dump the user to a shell where
+                  -- they can twiddle the environment and resume
+                  -- or quit
+
+test = undefined
 
 eval :: MonadState [RunState] m => Expression -> m MValue
 eval (ExpLit m) = return m
