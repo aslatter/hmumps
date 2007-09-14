@@ -15,6 +15,9 @@ module HMumps.Routine(Routine,
 
 import Data.Map
 
+import Prelude hiding (map)
+import qualified Prelude as P
+
 import HMumps.SyntaxTree
 
 
@@ -26,26 +29,32 @@ type Tag     = String
 
 -- |After initial parsing, do a pass over each tag to handle things.
 transform :: OldFile -> File
-transform xs = transform' [] xs
+transform [] = []
+transform (x:xs) = case x of
+                     (tag,0,[])   -> (tag, [Nop]) : transform xs
+                     (tag,0,cmds)| any isEmptyDo cmds -> (tag,replaceEmptyDos cmds xs) : transform xs
+                                 | otherwise -> (tag,cmds) : transform xs
+                     (_,_,_)    -> ("",[Nop]) : transform xs
 
-transform' :: File -> OldFile -> File
-transform' fs [] = reverse fs
-transform' fs (x:xs) = let f' = case x of
-                                 (tag,0,[])   -> (tag, [Nop])
+isEmptyDo :: Command -> Bool
+isEmptyDo (Do _ []) = True
+isEmptyDo _         = False
 
-                                 (tag,0,cmds)| hasFor cmds -> undefined tag
-                                             | hasDo  cmds -> undefined tag
+replaceEmptyDos :: Line -> OldFile -> Line
+replaceEmptyDos cmds oldlines =
+   let helper :: Command -> Command
+       helper (Do cond []) = Block cond tags llines
+       helper cmd = cmd
 
-                                 (_,_,_)    -> ("",[Nop])
+       tags :: Routine
+       tags = pack contents
 
+       llines :: [Line]
+       llines = P.map snd contents
 
-                       in transform' (f':fs) xs
-
-hasFor :: Line -> Bool
-hasFor = undefined
-
-hasDo :: Line -> Bool
-hasDo = undefined
+       contents :: File
+       contents = transform $ takeWhile (\(_,n,_) -> n >= 0) $ P.map (\(x,n+1,y) -> (x,n,y)) oldlines
+   in  P.map helper cmds
 
 pack :: File -> Routine
 pack = undefined

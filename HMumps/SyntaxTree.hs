@@ -37,6 +37,8 @@ import Text.Regex
 
 import Data.MValue
 
+import qualified Data.Map as M
+
 {- Definition of lexical tokens follows:
    routinehead -> name eol
    name -> startname [alphanumeric]
@@ -97,6 +99,7 @@ data Command = Break (Maybe Condition)
              | Write (Maybe Condition) [WriteArg]
              -- The following commands will not have parsers written for them
              | Nop
+             | Block (Maybe Condition) (M.Map String [[Command]]) [[Command]]
  deriving Show
 
 

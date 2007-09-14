@@ -2,7 +2,7 @@
 
 module HMumps.Runtime where
 
-import Prelude hiding (lookup)
+import Prelude hiding (lookup,break,map)
 import qualified Prelude as P
 
 import Data.Map
@@ -16,13 +16,28 @@ import HMumps.Parsers
 import Control.Monad.State
 import Control.Monad.Maybe
 
+-- |Anything you may ever want to strip indirection off of should
+--  be an instance of this class
+class Normalizable a where
+    normalize :: (MonadState [RunState] m, MonadIO m) => a -> m a
+
+instance Normalizable Vn where
+    normalize (IndirectVn expr subs)
+     = do result <- eval expr
+          let String str = mString result
+          case parse parseVn "Indirect VN" str of
+            Right (Lvn label subs') -> return $ Lvn label (subs' ++ subs)
+            Right (Gvn label subs') -> return $ Gvn label (subs' ++ subs)
+            Right (IndirectVn expr' subs') -> normalize $ IndirectVn expr' (subs' ++ subs)
+            Left err -> fail . show $ err
+    normalize v = return v
+          
 
 data RunState = RunState {env       :: Env,
-                          linelevel :: Int,
                           tags      :: Routine}
 
 emptyState :: [RunState]
-emptyState = [RunState NoFrame 0 empty]
+emptyState = [RunState NoFrame empty]
 
 data Env = NoFrame
          | NormalFrame (Map String MArray)
@@ -72,53 +87,61 @@ set :: MonadState [RunState] m => String -> MArray -> m ()
 set str ma = modify (set' str ma)
 
 
-exec :: MonadState [RunState] m => Line -> m ()
-exec []  = return ()
+exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe MValue)
+exec []  = return Nothing
 exec (Nop:cmds) = exec cmds
 exec (ForInf:cmds) = forInf (cycle cmds)
 exec ((Break cond):cmds) = case cond of
-    Nothing -> break
-    Just exp -> do mv <- eval exp
-                   if mToBool mv
-                    then break
-                    else exec cmds
-exec (Else:cmds) = do t <- test
+    Nothing -> break >> exec cmds
+    Just expr -> do mv <- eval expr
+                    if mToBool mv
+                     then break >> exec cmds
+                     else exec cmds
+exec (Else:cmds) = do t <- getTest
                       if t
                        then exec cmds
-                       else return ()
+                       else return Nothing
+exec ((If xs):cmds) = do ms <- mapM eval xs
+                         if or $ P.map mToBool ms
+                          then setTest True  >> exec cmds
+                          else setTest False >> return Nothing
+exec _ = undefined
 
 
+forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe MValue)
 forInf ((Quit cond Nothing):xs) = case cond of
-    Nothing  -> return ()
-    Just exp -> do mv <- eval exp
-                   if mToBool mv
-                    then return ()
-                    else forInf xs
+    Nothing  -> return Nothing
+    Just expr -> do mv <- eval expr
+                    if mToBool mv
+                     then return Nothing
+                     else forInf xs
 forInf ((Quit _ _):_) = fail "QUIT with argument in a for loop"
-forInf (cmd:xs) = exec cmd >> forInf xs
+forInf (cmd:xs) = exec [cmd] >> forInf xs
+forInf [] = forInf []  -- dumb
 
-break = undefined -- ^will someday dump the user to a shell where
+break ::  (MonadState [RunState] m, MonadIO m) => m ()
+break = undefined -- ^will someday dump the user to a repl where
                   -- they can twiddle the environment and resume
                   -- or quit
 
-test = undefined
+getTest :: (MonadState [RunState] m) => m Bool
+getTest = undefined
 
-eval :: MonadState [RunState] m => Expression -> m MValue
+setTest ::  (MonadState [RunState] m) => Bool -> m ()
+setTest = undefined
+
+eval :: (MonadState [RunState] m, MonadIO m) => Expression -> m MValue
 eval (ExpLit m) = return m
-eval (ExpVn vn) = case vn of
-                    Lvn label subs -> do ma <- fetch' label
-                                         mvs <- mapM eval subs
-                                         case mIndex ma mvs of
-                                           Just mv -> return mv
-                                           Nothing -> return $ String ""
-                    Gvn _ _ -> fail "Globals not yet implemented"
-                    IndirectVn expr subs -> do result <- eval expr
-                                               let String str = mString result
-                                               case parse parseVn "Indirect VN" str of
-                                                 Right (Lvn label subs') -> eval $ ExpVn $ Lvn label (subs' ++ subs)
-                                                 Right (Gvn label subs') -> eval $ ExpVn $ Gvn label (subs' ++ subs)
-                                                 Right (IndirectVn expr' subs') -> eval $ ExpVn $ IndirectVn expr' (subs' ++ subs)
-                                                 Left err -> fail . show $ err
+eval (ExpVn vn) = do vn' <- normalize vn
+                     case vn' of
+                       Lvn label subs -> do ma <- fetch' label
+                                            mvs <- mapM eval subs
+                                            case mIndex ma mvs of
+                                              Just mv -> return mv
+                                              Nothing -> return $ String ""
+                       Gvn _ _        -> fail "Globals not yet implemented"
+                       IndirectVn _ _ -> fail "normalized VNs should not be indirect"
+
 eval (ExpUnop unop expr) = do mv <- eval expr
                               return $ case unop of
                                 UNot   -> mNot   mv
