@@ -91,6 +91,21 @@ exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 exec []  = return Nothing
 exec (Nop:cmds) = exec cmds
 exec (ForInf:cmds) = forInf (cycle cmds)
+exec ((For vn farg):cmds) = case farg of
+                              ForArg1 expr -> exec $ (Set Nothing [([vn],expr)]) : ForInf : cmds
+                              ForArg2 exprStart exprInc ->
+                               do mStart <- eval exprStart
+                                  mInc   <- eval exprInc
+                                  exec $ (Set Nothing [([vn],ExpLit mStart)]) : ForInf : cmds ++
+                                    [Set Nothing [([vn],ExpBinop Add (ExpVn vn) (ExpLit mInc))]]
+                              ForArg3 exprStart exprInc exprTest -> 
+                               do mStart <- eval exprStart
+                                  mInc   <- eval exprInc
+                                  mTest  <- eval exprTest
+                                  exec $ (Set Nothing [([vn],ExpLit mStart)]) : ForInf : cmds ++
+                                    [Set Nothing [([vn],ExpBinop Add (ExpVn vn) (ExpLit mInc))],
+                                     Quit (Just $ ExpBinop (if mToBool (mTest `mLT` 0) then LessThan else GreaterThan)
+                                                   (ExpVn vn) (ExpLit mTest)) Nothing]
 exec ((Break cond):cmds) = case cond of
     Nothing -> break >> exec cmds
     Just expr -> do mv <- eval expr
