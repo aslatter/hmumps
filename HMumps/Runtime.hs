@@ -120,9 +120,7 @@ forInf (cmd:xs) = exec [cmd] >> forInf xs
 forInf [] = forInf []  -- dumb
 
 break ::  (MonadState [RunState] m, MonadIO m) => m ()
-break = undefined -- ^will someday dump the user to a repl where
-                  -- they can twiddle the environment and resume
-                  -- or quit
+break = undefined
 
 getTest :: (MonadState [RunState] m) => m Bool
 getTest = undefined

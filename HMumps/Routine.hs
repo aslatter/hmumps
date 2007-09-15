@@ -53,7 +53,7 @@ replaceEmptyDos cmds oldlines =
        llines = P.map snd contents
 
        contents :: File
-       contents = transform $ takeWhile (\(_,n,_) -> n >= 0) $ P.map (\(x,n+1,y) -> (x,n,y)) oldlines
+       contents = transform $ takeWhile (\(_,n,_) -> n >= 0) $ P.map (\(x,n,y) -> (x,n-1,y)) oldlines
    in  P.map helper cmds
 
 pack :: File -> Routine
