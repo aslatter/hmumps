@@ -87,7 +87,7 @@ set :: MonadState [RunState] m => String -> MArray -> m ()
 set str ma = modify (set' str ma)
 
 
-exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe MValue)
+exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 exec []  = return Nothing
 exec (Nop:cmds) = exec cmds
 exec (ForInf:cmds) = forInf (cycle cmds)
@@ -108,7 +108,7 @@ exec ((If xs):cmds) = do ms <- mapM eval xs
 exec _ = undefined
 
 
-forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe MValue)
+forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 forInf ((Quit cond Nothing):xs) = case cond of
     Nothing  -> return Nothing
     Just expr -> do mv <- eval expr
