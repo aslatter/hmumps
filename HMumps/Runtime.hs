@@ -1,6 +1,12 @@
 {-# OPTIONS -fglasgow-exts -Wall -Werror #-}
 
-module HMumps.Runtime where
+module HMumps.Runtime(RunState(..),
+                      Normalizable(..),
+                      emptyState,
+                      eval,
+                      exec,
+                      Env(..))
+where
 
 import Prelude hiding (lookup,break,map)
 import qualified Prelude as P
@@ -90,10 +96,17 @@ change :: MonadState [RunState] m => String -> [MValue] -> MValue -> m ()
 change name subs val = do ma <- fetch name
                           setVar name (arrayUpdate ma subs val)
 
+orM :: Monad m => [m Bool] -> m Bool
+orM [] = return False
+orM (x:xs) = do x' <- x
+                if x'
+                 then return True
+                 else orM xs
+
 -- |A return value of 'Nothing' indicates we did not quit, and should not unroll the stack.
 -- A return value of 'Just Nothing' means we should quit with no return value.
 -- A return value of 'Just (Just mv)' means that we should quit with a return value of mv.
-exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
+exec :: (MonadState [RunState] m, MonadIO m, Functor m) => Line -> m (Maybe (Maybe MValue))
 exec []  = return Nothing
 exec (Nop:cmds) = exec cmds
 exec (ForInf:cmds) = forInf (cycle cmds)
@@ -119,11 +132,12 @@ exec ((Break cond):cmds) = case cond of
                      then break >> exec cmds
                      else exec cmds
 exec (Else:cmds) = do t <- getTest
-                      if t
+                      if not t
                        then exec cmds
                        else return Nothing
-exec ((If xs):cmds) = do ms <- mapM eval xs
-                         if or $ P.map mToBool ms
+exec ((If xs):cmds) = do let xs' =  fmap eval xs
+                         cond <-  orM $ (fmap . fmap) mToBool xs'
+                         if cond
                           then setTest True  >> exec cmds
                           else setTest False >> return Nothing
 exec ((Write cond ws):cmds) = case cond of
@@ -137,7 +151,7 @@ exec (cmd:cmds) = case cmd of
                      if mToBool mTest
                       then set sas >> exec cmds
                       else exec cmds
-   _ -> fail "I'm not finished witht the command executor.  Sorry."
+   c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ show c) >> return Nothing
 
 set :: (MonadState [RunState] m, MonadIO m) => [SetArg] -> m ()
 set [] = return ()
@@ -164,7 +178,7 @@ writeFormat (Formfeed : fs) = liftIO (putChar '\f') >> writeFormat fs
 writeFormat (Newline  : fs) = liftIO (putChar '\n') >> writeFormat fs
 writeFormat (Tab n    : fs) = liftIO (putStr $ replicate n ' ') >> writeFormat fs  -- Not quite right, should align to nth column
 
-forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
+forInf ::  (MonadState [RunState] m, MonadIO m, Functor m) => Line -> m (Maybe (Maybe MValue))
 forInf ((Quit cond Nothing):xs) = case cond of
     Nothing  -> return Nothing
     Just expr -> do mv <- eval expr
@@ -176,13 +190,13 @@ forInf (cmd:xs) = exec [cmd] >> forInf xs
 forInf [] = forInf []  -- dumb
 
 break ::  (MonadState [RunState] m, MonadIO m) => m ()
-break = undefined
+break = fail "BREAK not working"
 
-getTest :: (MonadState [RunState] m) => m Bool
-getTest = undefined
+getTest :: (MonadState [RunState] m, MonadIO m) => m Bool
+getTest = liftM mToBool $ eval $ ExpVn $ Lvn "$test" []
 
-setTest ::  (MonadState [RunState] m) => Bool -> m ()
-setTest = undefined
+setTest ::  (MonadState [RunState] m, MonadIO m, Functor m) => Bool -> m ()
+setTest t = (exec $ return $ Set Nothing $ return $ (return $ Lvn "$test" [], ExpLit $ boolToM t) )>> return ()
 
 eval :: (MonadState [RunState] m, MonadIO m) => Expression -> m MValue
 eval (ExpLit m) = return m

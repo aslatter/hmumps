@@ -15,7 +15,7 @@ import HMumps.Runtime
 main :: IO ()
 main = hSetBuffering stdout NoBuffering >> putStrLn splash >> runStateT loop emptyState >> return ()
 
-loop :: (MonadState [RunState] m, MonadIO m) => m ()
+loop :: (MonadState [RunState] m, MonadIO m, Functor m) => m ()
 loop = do line <- liftIO $ readline "> "
           case line of
             Just x -> do liftIO $ addHistory x
@@ -39,11 +39,11 @@ interpreterCommands "w" next = (liftIO $ mapM_ putStrLn
 interpreterCommands "lvns" next = do ev <- (env . head) `liftM` get
                                      case ev of
                                        NoFrame -> next
-                                       NormalFrame m -> mapM_ (liftIO . putStrLn . show) (keys m) >> next
-                                       StopFrame m -> mapM_ (liftIO . putStrLn . show) (keys m) >> next
+                                       NormalFrame m -> mapM_ (liftIO . putStrLn) (keys m) >> next
+                                       StopFrame m -> mapM_ (liftIO . putStrLn) (keys m) >> next
 interpreterCommands str next = (liftIO $ putStrLn $ "Unkown interpreter command: " ++ str) >> next
 
-repl :: (MonadState [RunState] m, MonadIO m) => String -> m ()
+repl :: (MonadState [RunState] m, MonadIO m, Functor m) => String -> m ()
 repl [] = return ()
 repl x = case parse parseCommands "" x of
            Left err -> liftIO $ putStrLn $ show err
