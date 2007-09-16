@@ -122,8 +122,28 @@ exec ((If xs):cmds) = do ms <- mapM eval xs
                          if or $ P.map mToBool ms
                           then setTest True  >> exec cmds
                           else setTest False >> return Nothing
+exec ((Write cond ws):cmds) = case cond of
+                                Nothing   -> write ws >> exec cmds
+                                Just expr -> do mcond <- eval expr
+                                                (if mToBool mcond then write ws else return ()) >> exec cmds
+
+
 exec _ = undefined
 
+write :: (MonadIO m, MonadState [RunState] m) => [WriteArg] -> m ()
+write [] = return ()
+write (wa:ws) = case wa of
+                  WriteExpression expr -> do m <- eval expr
+                                             let String s = mString m
+                                             liftIO $ putStr s
+                                             write ws
+                  WriteFormat fs -> writeFormat fs >> write ws
+
+writeFormat :: MonadIO m => [WriteFormatCode] -> m ()
+writeFormat [] = return ()
+writeFormat (Formfeed : fs) = liftIO (putChar '\f') >> writeFormat fs
+writeFormat (Newline  : fs) = liftIO (putChar '\n') >> writeFormat fs
+writeFormat (Tab n    : fs) = liftIO (putStr $ replicate n ' ') >> writeFormat fs  -- Not quite right, should align to nth column
 
 forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 forInf ((Quit cond Nothing):xs) = case cond of

@@ -4,11 +4,12 @@ module Main where
 
 import HMumps.Parsers
 
-import Control.Monad
 import Text.ParserCombinators.Parsec
 import System.IO
 import System.Console.Readline -- Note, uses GNU readline, under GPL
-import Data.MArray
+import Control.Monad.State
+
+import HMumps.Runtime
 
 main :: IO ()
 main = hSetBuffering stdout NoBuffering >> putStrLn splash >> loop 
@@ -40,7 +41,8 @@ repl :: String -> IO ()
 repl [] = return ()
 repl x = case parse parseCommands "" x of
            Left err -> putStrLn $ show err
-           Right xs -> sequence_ $ map (putStrLn . show) xs
+           Right xs -> runStateT (exec xs) emptyState >> return ()
+
 
 splash :: String
 splash = concat 
