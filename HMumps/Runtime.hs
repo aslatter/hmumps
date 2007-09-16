@@ -132,7 +132,7 @@ exec ((Write cond ws):cmds) = case cond of
                                                 (if mToBool mcond then write ws else return ()) >> exec cmds
 exec (cmd:cmds) = case cmd of
    Set cond sas -> case cond of
-     Nothing   -> exec cmds
+     Nothing   -> set sas >> exec cmds
      Just expr -> do mTest <- eval expr
                      if mToBool mTest
                       then set sas >> exec cmds

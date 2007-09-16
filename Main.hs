@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror #-}
+{-# OPTIONS -Wall -Werror -fglasgow-exts #-}
 
 module Main where
 
