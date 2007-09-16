@@ -155,24 +155,21 @@ mEqual :: MValue -> MValue -> MValue
 mEqual l r = boolToM $ l == r
 
 mLT :: MValue -> MValue -> MValue
-mLT (String l) (String r) = boolToM $ l < r
-mLT (String l) r = let String r' = mString r
-                    in boolToM $ l < r'
-mLT l (String r) = let String l' = mString l
-                    in boolToM $ l' < r
-mLT l r = let String l' = mString l
-              String r' = mString r
-           in boolToM $ l' < r'
+mLT (Number n1) (Number n2) = boolToM $ n1 < n2
+mLT (Float  f1) (Number n2) = boolToM $ f1 < (fromIntegral n2)
+mLT (Number n1) (Float  f2) = boolToM $ (fromIntegral n1) < f2
+mLT (Float  f1) (Float  f2) = boolToM $ f1 < f2
+mLT l@(String _) r = (mNum l) `mLT` r
+mLT l r@(String _) = l `mLT` (mNum r)
 
 mGT :: MValue -> MValue -> MValue
-mGT (String l) (String r) = boolToM $ l > r
-mGT (String l) r = let String r' = mString r
-                    in boolToM $ l > r'
-mGT l (String r) = let String l' = mString l
-                    in boolToM $ l' > r
-mGT l r = let String l' = mString l
-              String r' = mString r
-           in boolToM $ l' > r'
+mGT (Number n1) (Number n2) = boolToM $ n1 > n2
+mGT (Float  f1) (Number n2) = boolToM $ f1 > (fromIntegral n2)
+mGT (Number n1) (Float  f2) = boolToM $ (fromIntegral n1) > f2
+mGT (Float  f1) (Float  f2) = boolToM $ f1 > f2
+mGT l@(String _) r = (mNum l) `mGT` r
+mGT l r@(String _) = l `mGT` (mNum r)
+
 
 mNumBinop :: (forall a . Num a => a -> a -> a) -> (MValue -> MValue -> MValue)
 mNumBinop op (Number a) (Number b)   = Number $ a `op` b
