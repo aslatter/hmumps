@@ -12,21 +12,21 @@ import Control.Monad.State
 import HMumps.Runtime
 
 main :: IO ()
-main = hSetBuffering stdout NoBuffering >> putStrLn splash >> loop 
+main = hSetBuffering stdout NoBuffering >> putStrLn splash >> runStateT loop emptyState >> return ()
 
-loop :: IO ()
-loop = do line <- readline "> "
+loop :: (MonadState [RunState] m, MonadIO m) => m ()
+loop = do line <- liftIO $ readline "> "
           case line of
-            Just x -> do addHistory x
+            Just x -> do liftIO $ addHistory x
                          case x of
                            '!':xs -> interpreterCommands xs loop
 	                   _ -> (repl . strip) x >> loop
-            Nothing -> putStrLn "" >> return ()
+            Nothing -> liftIO (putStrLn "") >> return ()
 
 
-interpreterCommands :: String -> IO () -> IO ()
+interpreterCommands :: MonadIO m => String -> m () -> m ()
 interpreterCommands "q" _    = return ()
-interpreterCommands "w" next = mapM_ putStrLn 
+interpreterCommands "w" next = (liftIO $ mapM_ putStrLn 
  ["  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY",
   "APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT",
   "HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY",
@@ -34,14 +34,14 @@ interpreterCommands "w" next = mapM_ putStrLn
   "THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR",
   "PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM",
   "IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF",
-  "ALL NECESSARY SERVICING, REPAIR OR CORRECTION."] >> next
-interpreterCommands str next = putStrLn ("Unkown interpreter command: " ++ str) >> next
+  "ALL NECESSARY SERVICING, REPAIR OR CORRECTION."]) >> next
+interpreterCommands str next = (liftIO $ putStrLn $ "Unkown interpreter command: " ++ str) >> next
 
-repl :: String -> IO ()
+repl :: (MonadState [RunState] m, MonadIO m) => String -> m ()
 repl [] = return ()
 repl x = case parse parseCommands "" x of
-           Left err -> putStrLn $ show err
-           Right xs -> runStateT (exec xs) emptyState >> return ()
+           Left err -> liftIO $ putStrLn $ show err
+           Right xs -> exec xs >> return ()
 
 
 splash :: String
