@@ -44,8 +44,8 @@ data Env = NoFrame
          | StopFrame (Map String (Maybe MArray))
 
 
-fetch :: String -> [RunState] -> Maybe MArray
-fetch str xs = join $ foldr helper Nothing (P.map (look str . env) xs)
+fetch' :: String -> [RunState] -> Maybe MArray
+fetch' str xs = join $ foldr helper Nothing (P.map (look str . env) xs)
 
  where helper :: Maybe (Maybe MArray) -> Maybe (Maybe MArray) -> Maybe (Maybe MArray)
        helper x Nothing      = x
@@ -62,29 +62,33 @@ look str (StopFrame m) = case lookup str m of
                            x            -> x
 
 -- |Returns the MArray associated with the named local var, or the empty MArray
-fetch' :: MonadState [RunState] m => String -> m MArray
-fetch' str = do result <- (fetch str) `liftM` get
-                case result of
+fetch :: MonadState [RunState] m => String -> m MArray
+fetch str = do result <- (fetch' str) `liftM` get
+               case result of
                   Just x  -> return x
                   Nothing -> return mEmpty
 
 
-set' :: String -> MArray -> [RunState] -> [RunState]
-set' _ _ []        = error "set called with an empty stack"
-set' str ma (x:[]) = case (env x) of
+put' :: String -> MArray -> [RunState] -> [RunState]
+put' _ _ []        = error "set called with an empty stack"
+put' str ma (x:[]) = case (env x) of
                       NoFrame -> x {env = (NormalFrame (insert str ma empty))} : []
                       NormalFrame m -> x {env = (NormalFrame (insert str ma m))} : []
                       StopFrame m -> x {env = (StopFrame (insert str (Just ma) m))} : []
-set' str ma (x:xs) = case (look str . env) x of 
-                      Nothing -> x : (set' str ma xs)
+put' str ma (x:xs) = case (look str . env) x of 
+                      Nothing -> x : (put' str ma xs)
                       Just _ -> case env x of
                                   NoFrame -> error "something bad happened in HMumps.Runtime.set"
                                   NormalFrame m -> x {env = (NormalFrame (insert str ma m))} : xs
                                   StopFrame m -> x {env = (StopFrame (insert str (Just ma) m))} : xs
 
 
-set :: MonadState [RunState] m => String -> MArray -> m ()
-set str ma = modify (set' str ma)
+setVar :: MonadState [RunState] m => String -> MArray -> m ()
+setVar str ma = modify (put' str ma)
+
+change :: MonadState [RunState] m => String -> [MValue] -> MValue -> m ()
+change name subs val = do ma <- fetch name
+                          setVar name (arrayUpdate ma subs val)
 
 -- |A return value of 'Nothing' indicates we did not quit, and should not unroll the stack.
 -- A return value of 'Just Nothing' means we should quit with no return value.
@@ -126,9 +130,24 @@ exec ((Write cond ws):cmds) = case cond of
                                 Nothing   -> write ws >> exec cmds
                                 Just expr -> do mcond <- eval expr
                                                 (if mToBool mcond then write ws else return ()) >> exec cmds
+exec (cmd:cmds) = case cmd of
+   Set cond sas -> case cond of
+     Nothing   -> exec cmds
+     Just expr -> do mTest <- eval expr
+                     if mToBool mTest
+                      then set sas >> exec cmds
+                      else exec cmds
+   _ -> fail "I'm not finished witht the command executor.  Sorry."
 
-
-exec _ = undefined
+set :: (MonadState [RunState] m, MonadIO m) => [SetArg] -> m ()
+set [] = return ()
+set ((vns,expr):ss) = do vns' <- mapM normalize vns
+                         mv <- eval expr
+                         mapM_ (setHelper mv) vns' >> set ss
+ where setHelper mv (Lvn name subs) = do subs' <- mapM eval subs
+                                         change name subs' mv
+       setHelper _ (Gvn _ _)        = fail "We don't supposrt global variables yet.  sorry."
+       setHelper _ (IndirectVn _ _) = undefined -- we've already normalized the variable name
 
 write :: (MonadIO m, MonadState [RunState] m) => [WriteArg] -> m ()
 write [] = return ()
@@ -169,7 +188,7 @@ eval :: (MonadState [RunState] m, MonadIO m) => Expression -> m MValue
 eval (ExpLit m) = return m
 eval (ExpVn vn) = do vn' <- normalize vn
                      case vn' of
-                       Lvn label subs -> do ma <- fetch' label
+                       Lvn label subs -> do ma <- fetch label
                                             mvs <- mapM eval subs
                                             case mIndex ma mvs of
                                               Just mv -> return mv

@@ -8,6 +8,7 @@ import Text.ParserCombinators.Parsec
 import System.IO
 import System.Console.Readline -- Note, uses GNU readline, under GPL
 import Control.Monad.State
+import Data.Map
 
 import HMumps.Runtime
 
@@ -24,7 +25,7 @@ loop = do line <- liftIO $ readline "> "
             Nothing -> liftIO (putStrLn "") >> return ()
 
 
-interpreterCommands :: MonadIO m => String -> m () -> m ()
+interpreterCommands :: (MonadIO m, MonadState [RunState] m) => String -> m () -> m ()
 interpreterCommands "q" _    = return ()
 interpreterCommands "w" next = (liftIO $ mapM_ putStrLn 
  ["  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY",
@@ -35,6 +36,11 @@ interpreterCommands "w" next = (liftIO $ mapM_ putStrLn
   "PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM",
   "IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF",
   "ALL NECESSARY SERVICING, REPAIR OR CORRECTION."]) >> next
+interpreterCommands "lvns" next = do ev <- (env . head) `liftM` get
+                                     case ev of
+                                       NoFrame -> next
+                                       NormalFrame m -> mapM_ (liftIO . putStrLn . show) (keys m) >> next
+                                       StopFrame m -> mapM_ (liftIO . putStrLn . show) (keys m) >> next
 interpreterCommands str next = (liftIO $ putStrLn $ "Unkown interpreter command: " ++ str) >> next
 
 repl :: (MonadState [RunState] m, MonadIO m) => String -> m ()
