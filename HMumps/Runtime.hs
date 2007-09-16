@@ -86,7 +86,9 @@ set' str ma (x:xs) = case (look str . env) x of
 set :: MonadState [RunState] m => String -> MArray -> m ()
 set str ma = modify (set' str ma)
 
-
+-- |A return value of 'Nothing' indicates we did not quit, and should not unroll the stack.
+-- A return value of 'Just Nothing' means we should quit with no return value.
+-- A return value of 'Just (Just mv)' means that we should quit with a return value of mv.
 exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 exec []  = return Nothing
 exec (Nop:cmds) = exec cmds
