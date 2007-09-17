@@ -22,6 +22,9 @@ import HMumps.Parsers
 import Control.Monad.State
 import Control.Monad.Maybe
 
+import System(exitWith)
+import System.Exit(ExitCode(..))
+
 -- |Anything you may ever want to strip indirection off of should
 --  be an instance of this class
 class Normalizable a where
@@ -151,6 +154,12 @@ exec (cmd:cmds) = case cmd of
                      if mToBool mTest
                       then set sas >> exec cmds
                       else exec cmds
+   Halt cond -> case cond of
+                  Nothing -> liftIO (exitWith ExitSuccess) >> return Nothing
+                  Just expr -> do mv <- eval expr
+                                  if mToBool mv
+                                   then liftIO (exitWith ExitSuccess) >> return Nothing
+                                   else exec cmds
    c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ show c) >> return Nothing
 
 set :: (MonadState [RunState] m, MonadIO m) => [SetArg] -> m ()

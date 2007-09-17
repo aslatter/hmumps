@@ -23,6 +23,7 @@ import Data.MValue
 import HMumps.Routine
 import HMumps.SyntaxTree
 
+import Data.Char
 import Control.Monad
 import Text.ParserCombinators.Parsec
 import Text.Regex
@@ -273,7 +274,7 @@ stringOrPrefix str = stringOrPrefix1 str <|> return []
 
 stringOrPrefix1 :: String -> Parser String
 stringOrPrefix1 [] = return []
-stringOrPrefix1 (x:xs) = do y <- char x
+stringOrPrefix1 (x:xs) = do y <- char (toUpper x) <|> char (toLower x) <|> char x
                             ys <- stringOrPrefix xs
                             return (y:ys)
 
