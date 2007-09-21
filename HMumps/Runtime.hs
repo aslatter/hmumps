@@ -38,9 +38,19 @@ instance Normalizable Vn where
             Right (Lvn label subs') -> return $ Lvn label (subs' ++ subs)
             Right (Gvn label subs') -> return $ Gvn label (subs' ++ subs)
             Right (IndirectVn expr' subs') -> normalize $ IndirectVn expr' (subs' ++ subs)
-            Left err -> fail . show $ err
-    normalize v = return v
-          
+            Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+    normalize x = return x
+
+instance Normalizable WriteArg where
+    normalize (WriteIndirect expr)
+     = do result <- eval expr
+          let String str = mString result
+          case parse parseWriteArg "Indirect Write Argument" str of
+            Right wa -> return wa
+            Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+    normalize x = return x
+
+
 
 data RunState = RunState {env       :: Env,
                           tags      :: Routine}
@@ -174,12 +184,14 @@ set ((vns,expr):ss) = do vns' <- mapM normalize vns
 
 write :: (MonadIO m, MonadState [RunState] m) => [WriteArg] -> m ()
 write [] = return ()
-write (wa:ws) = case wa of
-                  WriteExpression expr -> do m <- eval expr
-                                             let String s = mString m
-                                             liftIO $ putStr s
-                                             write ws
-                  WriteFormat fs -> writeFormat fs >> write ws
+write (wa:ws) = do wa' <- normalize wa
+                   case wa' of
+                     WriteExpression expr -> do m <- eval expr
+                                                let String s = mString m
+                                                liftIO $ putStr s
+                                                write ws
+                     WriteFormat fs -> writeFormat fs >> write ws
+                     WriteIndirect _ -> undefined -- normalize should take care of us.
 
 writeFormat :: MonadIO m => [WriteFormatCode] -> m ()
 writeFormat [] = return ()

@@ -171,6 +171,7 @@ data NewArg = NewSelective Name
 
 data WriteArg = WriteExpression Expression
               | WriteFormat [WriteFormatCode]
+              | WriteIndirect Expression
  deriving Show
 
 data WriteFormatCode = Formfeed
