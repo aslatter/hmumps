@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror -fglasgow-exts #-}
+{-# OPTIONS -Wall -Werror -fglasgow-exts -fth #-}
 
 module Main where
 
@@ -11,6 +11,8 @@ import Control.Monad.State
 import Data.Map
 
 import HMumps.Runtime
+
+import Templates
 
 main :: IO ()
 main = hSetBuffering stdout NoBuffering >> putStrLn splash >> runStateT loop emptyState >> return ()
@@ -27,15 +29,7 @@ loop = do line <- liftIO $ readline "> "
 
 interpreterCommands :: (MonadIO m, MonadState [RunState] m) => String -> m () -> m ()
 interpreterCommands "q" _    = return ()
-interpreterCommands "w" next = (liftIO $ mapM_ putStrLn 
- ["  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY",
-  "APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT",
-  "HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY",
-  "OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,",
-  "THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR",
-  "PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM",
-  "IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF",
-  "ALL NECESSARY SERVICING, REPAIR OR CORRECTION."]) >> next
+interpreterCommands "w" next = (liftIO $ putStrLn warranty) >> next
 interpreterCommands "lvns" next = do ev <- (env . head) `liftM` get
                                      case ev of
                                        NoFrame -> next
@@ -51,9 +45,7 @@ repl x = case parse parseCommands "" x of
 
 
 splash :: String
-splash = concat 
- ["HMUMPS  Copyright (C) 2007  Antoine Latter, Creighton Hogg\n",
-  "This program comes with ABSOLUTELY NO WARRANTY; for details type `!w'.\n",
-  "This is free software, and you are welcome to redistribute it\n",
-  "under certain conditions; for details see the enclosed LICENSE file.\n",
-  ""]
+splash = $(bakedString "SPLASH")
+
+warranty :: String
+warranty = $(bakedString "WARRANTY")
