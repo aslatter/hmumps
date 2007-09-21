@@ -20,10 +20,12 @@ main = hSetBuffering stdout NoBuffering >> putStrLn splash >> runStateT loop emp
 loop :: (MonadState [RunState] m, MonadIO m, Functor m) => m ()
 loop = do line <- liftIO $ readline "> "
           case line of
-            Just x -> do liftIO $ addHistory x
-                         case x of
-                           '!':xs -> interpreterCommands xs loop
-	                   _ -> (repl . strip) x >> loop
+            Just x -> if x == ""
+                      then loop
+                      else do liftIO $ addHistory x
+                              case x of
+                                '!':xs -> interpreterCommands xs loop
+	                        _ -> (repl . strip) x >> loop
             Nothing -> liftIO (putStrLn "") >> return ()
 
 
@@ -41,7 +43,7 @@ repl :: (MonadState [RunState] m, MonadIO m, Functor m) => String -> m ()
 repl [] = return ()
 repl x = case parse parseCommands "" x of
            Left err -> liftIO $ putStrLn $ show err
-           Right xs -> exec xs >> return ()
+           Right xs -> exec xs >> liftIO (putChar '\n') >> return ()
 
 
 splash :: String
