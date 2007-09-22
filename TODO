@@ -1,6 +1,4 @@
 LineAST:
-	command labels are case-sensitive
-
 	run the Main executable, and try to enter valid comands.
 	fix what doesn't work :)
 

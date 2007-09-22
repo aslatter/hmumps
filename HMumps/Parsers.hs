@@ -256,7 +256,11 @@ parseWrite = do stringOrPrefix1 "write"
 
 parseWriteArg :: Parser WriteArg
 parseWriteArg = (WriteFormat `liftM` many1 parseWriteFormatCode)
-            <|> (WriteIndirect `liftM` (char '@' >> parseExpAtom))
+            <|> do char '@'
+                   expr <- parseExpAtom
+                   (char '@' >> do args <- arglist parseExp
+                                   return $ WriteExpression $ ExpVn $ IndirectVn expr args)
+                    <|> (return $ WriteIndirect expr)
             <|> (WriteExpression `liftM` parseExp)
 
 parseWriteFormatCode :: Parser WriteFormatCode

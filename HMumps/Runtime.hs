@@ -35,9 +35,9 @@ instance Normalizable Vn where
      = do result <- eval expr
           let String str = mString result
           case parse parseVn "Indirect VN" str of
+            Right (IndirectVn expr' subs') -> normalize $ IndirectVn expr' (subs' ++ subs)
             Right (Lvn label subs') -> return $ Lvn label (subs' ++ subs)
             Right (Gvn label subs') -> return $ Gvn label (subs' ++ subs)
-            Right (IndirectVn expr' subs') -> normalize $ IndirectVn expr' (subs' ++ subs)
             Left err -> (liftIO . putStrLn . show $ err) >> fail ""
     normalize x = return x
 
@@ -46,7 +46,9 @@ instance Normalizable WriteArg where
      = do result <- eval expr
           let String str = mString result
           case parse parseWriteArg "Indirect Write Argument" str of
-            Right wa -> return wa
+            Right wa -> case wa of
+                          w@(WriteIndirect _) -> normalize w
+                          w -> return w
             Left err -> (liftIO . putStrLn . show $ err) >> fail ""
     normalize x = return x
 
@@ -180,7 +182,7 @@ set ((vns,expr):ss) = do vns' <- mapM normalize vns
  where setHelper mv (Lvn name subs) = do subs' <- mapM eval subs
                                          change name subs' mv
        setHelper _ (Gvn _ _)        = fail "We don't supposrt global variables yet.  sorry."
-       setHelper _ (IndirectVn _ _) = undefined -- we've already normalized the variable name
+       setHelper _ (IndirectVn _ _) = fail "Variable name should be normalized" -- we've already normalized the variable name
 
 write :: (MonadIO m, MonadState [RunState] m) => [WriteArg] -> m ()
 write [] = return ()
@@ -191,7 +193,7 @@ write (wa:ws) = do wa' <- normalize wa
                                                 liftIO $ putStr s
                                                 write ws
                      WriteFormat fs -> writeFormat fs >> write ws
-                     WriteIndirect _ -> undefined -- normalize should take care of us.
+                     WriteIndirect _ -> fail "write argument should be normalized" -- normalize should take care of us.
 
 writeFormat :: MonadIO m => [WriteFormatCode] -> m ()
 writeFormat [] = return ()
