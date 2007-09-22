@@ -1,11 +1,12 @@
 {-# OPTIONS -fglasgow-exts -Wall -Werror #-}
 
 module HMumps.Runtime(RunState(..),
-                      Normalizable(..),
+                      Env(..),
                       emptyState,
                       eval,
                       exec,
-                      Env(..))
+                      Normalizable(..)
+                     )
 where
 
 import Prelude hiding (lookup,break,map)
