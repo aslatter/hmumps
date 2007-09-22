@@ -138,9 +138,13 @@ exec ((For vn farg):cmds) = case farg of
                                   mInc   <- eval exprInc
                                   mTest  <- eval exprTest
                                   exec $ (Set Nothing [([vn],ExpLit mStart)]) : ForInf : cmds ++
-                                    [Set Nothing [([vn],ExpBinop Add (ExpVn vn) (ExpLit mInc))],
-                                     Quit (Just $ ExpBinop (if mToBool (mTest `mLT` 0) then LessThan else GreaterThan)
-                                                   (ExpVn vn) (ExpLit mTest)) Nothing]
+
+                                   [Quit (Just $ if mToBool (mTest `mLT` 0)
+                                      then ExpBinop LessThan    (ExpVn vn) (ExpLit (mTest + 1))
+                                      else ExpBinop GreaterThan (ExpVn vn) (ExpLit (mTest - 1))) Nothing,
+
+                                    Set Nothing [([vn],ExpBinop Add (ExpVn vn) (ExpLit mInc))]]
+
 exec ((Break cond):cmds) = case cond of
     Nothing -> break >> exec cmds
     Just expr -> do mv <- eval expr
