@@ -17,7 +17,7 @@ import Templates
 main :: IO ()
 main = hSetBuffering stdout NoBuffering >> putStrLn splash >> runStateT loop emptyState >> return ()
 
-loop :: (MonadState [RunState] m, MonadIO m, Functor m) => m ()
+loop :: (MonadState [RunState] m, MonadIO m) => m ()
 loop = do line <- liftIO $ readline "> "
           case line of
             Just x -> if x == ""
@@ -39,7 +39,7 @@ interpreterCommands "lvns" next = do ev <- (env . head) `liftM` get
                                        StopFrame m -> mapM_ (liftIO . putStrLn) (keys m) >> next
 interpreterCommands str next = (liftIO $ putStrLn $ "Unkown interpreter command: " ++ str) >> next
 
-repl :: (MonadState [RunState] m, MonadIO m, Functor m) => String -> m ()
+repl :: (MonadState [RunState] m, MonadIO m) => String -> m ()
 repl [] = return ()
 repl x = case parse parseCommands "" x of
            Left err -> liftIO $ putStrLn $ show err

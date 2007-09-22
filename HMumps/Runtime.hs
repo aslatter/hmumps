@@ -122,7 +122,7 @@ orM (x:xs) = do x' <- x
 -- |A return value of 'Nothing' indicates we did not quit, and should not unroll the stack.
 -- A return value of 'Just Nothing' means we should quit with no return value.
 -- A return value of 'Just (Just mv)' means that we should quit with a return value of mv.
-exec :: (MonadState [RunState] m, MonadIO m, Functor m) => Line -> m (Maybe (Maybe MValue))
+exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 exec []  = return Nothing
 exec (Nop:cmds) = exec cmds
 exec (ForInf:cmds) = forInf (cycle cmds)
@@ -152,7 +152,7 @@ exec (Else:cmds) = do t <- getTest
                        then exec cmds
                        else return Nothing
 exec ((If xs):cmds) = do let xs' =  fmap eval xs
-                         cond <-  orM $ (fmap . fmap) mToBool xs'
+                         cond <- orM $ (liftM . liftM) mToBool xs'
                          if cond
                           then setTest True  >> exec cmds
                           else setTest False >> return Nothing
@@ -202,7 +202,7 @@ writeFormat (Formfeed : fs) = liftIO (putChar '\f') >> writeFormat fs
 writeFormat (Newline  : fs) = liftIO (putChar '\n') >> writeFormat fs
 writeFormat (Tab n    : fs) = liftIO (putStr $ replicate n ' ') >> writeFormat fs  -- Not quite right, should align to nth column
 
-forInf ::  (MonadState [RunState] m, MonadIO m, Functor m) => Line -> m (Maybe (Maybe MValue))
+forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 forInf ((Quit cond Nothing):xs) = case cond of
     Nothing  -> return Nothing
     Just expr -> do mv <- eval expr
@@ -219,7 +219,7 @@ break = fail "BREAK not working"
 getTest :: (MonadState [RunState] m, MonadIO m) => m Bool
 getTest = liftM mToBool $ eval $ ExpVn $ Lvn "$test" []
 
-setTest ::  (MonadState [RunState] m, MonadIO m, Functor m) => Bool -> m ()
+setTest ::  (MonadState [RunState] m, MonadIO m) => Bool -> m ()
 setTest t = (exec $ return $ Set Nothing $ return $ (return $ Lvn "$test" [], ExpLit $ boolToM t) )>> return ()
 
 eval :: (MonadState [RunState] m, MonadIO m) => Expression -> m MValue
