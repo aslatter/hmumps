@@ -71,7 +71,7 @@ order (MArray _ map') forward (mv:ms) = do vc <- lookup mv map'
                                            order vc forward ms
 order _ _ [] = undefined -- some sort of base case.  this function is all messed up :-(
 
-
+{-
 instance (Arbitrary a) => Arbitrary (Maybe a) where
     arbitrary            = sized arbMaybe
         where
@@ -79,6 +79,7 @@ instance (Arbitrary a) => Arbitrary (Maybe a) where
           arbMaybe n = fmap Just (resize (n-1) arbitrary)
     coarbitrary Nothing  = variant 0
     coarbitrary (Just x) = variant 1 . coarbitrary x
+-}
 
 instance Arbitrary MArray where
     arbitrary = do
