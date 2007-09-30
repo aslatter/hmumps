@@ -18,10 +18,11 @@ module HMumps.Parsers (
              arglist,
              arglist1,
              parse,
-             parseFile) where
+             --parseFile
+                      ) where
 
 import Data.MValue
-import HMumps.Routine
+-- import HMumps.Routine
 import HMumps.SyntaxTree
 
 import Data.Char
@@ -30,7 +31,7 @@ import Text.ParserCombinators.Parsec
 import Text.Regex
 
 
-
+{-
 parseFile :: Parser OldFile
 parseFile = many $
        do tag <- many $ noneOf "\t\n"
@@ -38,7 +39,7 @@ parseFile = many $
           linelevel <- length `liftM` many (do spaces; x <- char '.'; spaces; return x)
           cmds <- parseCommands
           return (tag, linelevel, cmds) 
-
+-}
 
 -- | The "initLex" function takes in a string representing all of the code
 -- to be parsed (say, an entire routine) and:
@@ -328,9 +329,9 @@ parseExpFuncall = do char '$'
                               (do char '^'
                                   name2 <- parseValidName
                                   args <- arglist parseFunArg
-                                  return $ FunCall name1 (Just name2) args)
+                                  return $ FunCall name1 name2 args)
                                <|> (do args <- arglist parseFunArg
-                                       return $ FunCall name1 Nothing args))
+                                       return $ FunCall name1 "" args))
                       
 
 parseSubExp :: Parser Expression

@@ -151,9 +151,6 @@ mAnd l r = boolToM $ (mToBool l) && (mToBool r)
 mOr :: MValue -> MValue -> MValue
 mOr l r  = boolToM $ (mToBool l) || (mToBool r)
 
-mEqual :: MValue -> MValue -> MValue
-mEqual l r = boolToM $ l == r
-
 mLT :: MValue -> MValue -> MValue
 mLT (Number n1) (Number n2) = boolToM $ n1 < n2
 mLT (Float  f1) (Number n2) = boolToM $ f1 < (fromIntegral n2)
@@ -206,7 +203,8 @@ instance Real MValue where
 
 instance Fractional MValue where
     fromRational a | denominator a == 1 = Number $ numerator a
-                   | True               = Float  $ fromRational a
+                   | otherwise          = Float  $ fromRational a
+    fromRational _ = undefined
 
     recip m@(Number 1) = m
     recip (Number n)   = Float $ 1/(fromIntegral n)
@@ -279,6 +277,14 @@ mRem mv (Float f2)   = mRem mv (Number . truncate $ f2)
 mRem s@(String _) mv = mRem (mNum s) mv
 mRem mv s@(String _) = mRem mv (mNum s)
 
+mPow :: MValue -> MValue -> MValue
+mPow l@(String _) r = (mNum l) `mPow` r
+mPow r l@(String _) = l `mPow` (mNum r)
+mPow (Number l) (Number r) = Number $ l ^ r
+mPow (Float l) (Float r)   = Float $ l ** r
+mPow (Number l) (Float r)  = Float $ (fromInteger l) ** r
+mPow (Float l) (Number r)  = Float $ l ^^ r
+
 
 instance Arbitrary Char where
     arbitrary = elements ('%':['A'..'z'])
@@ -299,15 +305,18 @@ instance Arbitrary MValue where
     coarbitrary (Float f) = variant 2 . coarbitrary f
 
 
+testStringCast :: MValue -> Bool
 testStringCast mv = mString mv == mv
-      where types = mv :: MValue
+      where _types = mv :: MValue
 
+testNumericCast :: Integer -> Bool
 testNumericCast f = Number f == (mNum . mString . Number) f
-      where types = f :: Integer
+      where _types = f :: Integer
 
 
 -- Displayed whole numbers should not have trailing zeros.  This is a check
 -- on that.
+testTrailingZero :: Integer -> Bool
 testTrailingZero n = (mString . Number) n == (mString . Float . fromIntegral) n
-      where types = n :: Integer
+      where _types = n :: Integer
 

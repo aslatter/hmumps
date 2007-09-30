@@ -1,11 +1,14 @@
-{-# OPTIONS -fglasgow-exts -Wall -Werror #-}
+{-# OPTIONS_GHC -Wall -Werror #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module HMumps.Runtime(RunState(..),
                       Env(..),
                       emptyState,
                       eval,
                       exec,
-                      Normalizable(..)
+                      Normalizable(..),
+                      setX, setY,
+                      addX, addY
                      )
 where
 
@@ -55,33 +58,39 @@ instance Normalizable WriteArg where
 
 
 
-data RunState = RunState {env       :: Env,
+data RunState = RunState {env       :: Maybe Env,
                           tags      :: Routine}
 
 emptyState :: [RunState]
-emptyState = [RunState NoFrame empty]
+emptyState = [RunState Nothing (\_ -> Nothing)]
 
-data Env = NoFrame
-         | NormalFrame (Map String MArray)
-         | StopFrame (Map String (Maybe MArray))
+data Env = Env EnvTag (Map String EnvEntry)
 
+data EnvTag = NormalEnv
+            | StopEnv
+
+data EnvEntry = LookBack (Maybe Name)
+              | Entry MArray
 
 fetch' :: String -> [RunState] -> Maybe MArray
-fetch' str xs = join $ foldr helper Nothing (P.map (look str . env) xs)
+fetch' str xs = join . fst $ foldr helper (Nothing,str) [x | Just x <- fmap env xs] where
 
- where helper :: Maybe (Maybe MArray) -> Maybe (Maybe MArray) -> Maybe (Maybe MArray)
-       helper x Nothing      = x
-       helper _ j@(Just _)   = j
+ helper :: Env -> (Maybe (Maybe MArray),Name) -> (Maybe (Maybe MArray), Name)
 
-look :: String -> Env -> Maybe (Maybe MArray)
-look _ NoFrame = Nothing
-look str (NormalFrame m) = case lookup str m of
-                             Nothing -> Nothing
-                             j       -> Just j
-look str (StopFrame m) = case lookup str m of
-                           Nothing      -> Just Nothing
-                           Just Nothing -> Nothing
-                           x            -> x
+ helper _ rhs@(Just _, _) = rhs
+ helper (Env tag m) (_,name) = case tag of
+                   NormalEnv -> case name `lookup` m of
+                                  Nothing -> (Nothing, name)
+                                  Just (Entry ma) -> (Just (Just ma), name)
+                                  Just (LookBack newname') -> case newname' of
+                                                             Just newname -> (Nothing, newname)
+                                                             Nothing      -> (Nothing, name)
+                   StopEnv   -> case name `lookup` m of
+                                  Nothing -> (Just Nothing, name)
+                                  Just (Entry ma) -> (Just (Just ma), name)
+                                  Just (LookBack newname') -> case newname' of
+                                                             Just newname -> (Nothing, newname)
+                                                             Nothing      -> (Nothing, name)
 
 -- |Returns the MArray associated with the named local var, or the empty MArray
 fetch :: MonadState [RunState] m => String -> m MArray
@@ -92,18 +101,21 @@ fetch str = do result <- (fetch' str) `liftM` get
 
 
 put' :: String -> MArray -> [RunState] -> [RunState]
-put' _ _ []        = error "set called with an empty stack"
+put' _ _ [] = error "SET called with an empty stack"
 put' str ma (x:[]) = case (env x) of
-                      NoFrame -> x {env = (NormalFrame (insert str ma empty))} : []
-                      NormalFrame m -> x {env = (NormalFrame (insert str ma m))} : []
-                      StopFrame m -> x {env = (StopFrame (insert str (Just ma) m))} : []
-put' str ma (x:xs) = case (look str . env) x of 
-                      Nothing -> x : (put' str ma xs)
-                      Just _ -> case env x of
-                                  NoFrame -> error "something bad happened in HMumps.Runtime.set"
-                                  NormalFrame m -> x {env = (NormalFrame (insert str ma m))} : xs
-                                  StopFrame m -> x {env = (StopFrame (insert str (Just ma) m))} : xs
+                      Nothing          -> x {env = Just $ Env NormalEnv (insert str (Entry ma) empty)} : []
+                      Just (Env tag m) -> x {env = Just $ Env tag       (insert str (Entry ma) m)} : []
+put' str ma (x:xs) = case (env x) of
+                      Nothing          -> x : (put' str ma xs)
+                      Just (Env tag m) -> let enter = x {env = Just $ Env tag (insert str (Entry ma) m)} : xs in
+                                          case str `lookup` m of
+                                            Nothing -> case tag of
+                                                         NormalEnv -> x : (put' str ma xs)
+                                                         StopEnv   -> enter
 
+                                            Just (Entry _)              ->  enter
+                                            Just (LookBack Nothing)     -> x : (put' str  ma xs)
+                                            Just (LookBack (Just str')) -> x : (put' str' ma xs)
 
 setVar :: MonadState [RunState] m => String -> MArray -> m ()
 setVar str ma = modify (put' str ma)
@@ -177,7 +189,7 @@ exec (cmd:cmds) = case cmd of
                                   if mToBool mv
                                    then liftIO (exitWith ExitSuccess) >> return Nothing
                                    else exec cmds
-   c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ show c) >> return Nothing
+   c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)) >> return Nothing
 
 set :: (MonadState [RunState] m, MonadIO m) => [SetArg] -> m ()
 set [] = return ()
@@ -187,7 +199,7 @@ set ((vns,expr):ss) = do vns' <- mapM normalize vns
  where setHelper mv (Lvn name subs) = do subs' <- mapM eval subs
                                          change name subs' mv
        setHelper _ (Gvn _ _)        = fail "We don't supposrt global variables yet.  sorry."
-       setHelper _ (IndirectVn _ _) = fail "Variable name should be normalized" -- we've already normalized the variable name
+       setHelper _ (IndirectVn _ _) = fail "Variable name should be normalized"
 
 write :: (MonadIO m, MonadState [RunState] m) => [WriteArg] -> m ()
 write [] = return ()
@@ -196,15 +208,49 @@ write (wa:ws) = do wa' <- normalize wa
                      WriteExpression expr -> do m <- eval expr
                                                 let String s = mString m
                                                 liftIO $ putStr s
+                                                addX $ fromIntegral $ length s
                                                 write ws
                      WriteFormat fs -> writeFormat fs >> write ws
-                     WriteIndirect _ -> fail "write argument should be normalized" -- normalize should take care of us.
+                     WriteIndirect _ -> fail "write argument should be normalized"
 
-writeFormat :: MonadIO m => [WriteFormatCode] -> m ()
+writeFormat :: (MonadIO m, MonadState [RunState] m)=> [WriteFormatCode] -> m ()
 writeFormat [] = return ()
-writeFormat (Formfeed : fs) = liftIO (putChar '\f') >> writeFormat fs
-writeFormat (Newline  : fs) = liftIO (putChar '\n') >> writeFormat fs
-writeFormat (Tab n    : fs) = liftIO (putStr $ replicate n ' ') >> writeFormat fs  -- Not quite right, should align to nth column
+writeFormat (Formfeed : fs) = liftIO (putChar '\f') >> writeFormat fs >> setY 1
+writeFormat (Newline  : fs) = liftIO (putChar '\n') >> writeFormat fs >> setX 1 >> addY 1
+writeFormat (Tab n    : fs) = do x <- getX
+                                 if x >= n'
+                                  then writeFormat fs
+                                  else do liftIO (putStr $ (replicate . floor) (n'-x) ' ')
+                                          setX n'
+                                          writeFormat fs
+ where n' = fromIntegral n
+
+setX :: MonadState [RunState] m => MValue -> m ()
+setX = change "$x" []
+
+setY :: MonadState [RunState] m => MValue -> m ()
+setY = change "$y" []
+
+getX :: MonadState [RunState] m => m MValue
+getX = getLocal "$x" []
+
+getY :: MonadState [RunState] m => m MValue
+getY = getLocal "y" []
+
+addX :: MonadState [RunState] m => Int -> m ()
+addX n = do x <- getX
+            setX (x + fromIntegral n)
+
+addY :: MonadState [RunState] m => Int -> m ()
+addY n = do y <- getY
+            setY (y + fromIntegral n)
+
+getLocal :: MonadState [RunState] m => String -> [MValue] -> m MValue
+getLocal label subs = do ma <- fetch label
+                         return $ case mIndex ma subs of
+                           Just mv -> mv
+                           Nothing -> String ""                         
+
 
 forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 forInf ((Quit cond Nothing):xs) = case cond of
@@ -220,21 +266,19 @@ forInf [] = forInf []  -- dumb
 break ::  (MonadState [RunState] m, MonadIO m) => m ()
 break = fail "BREAK not working"
 
-getTest :: (MonadState [RunState] m, MonadIO m) => m Bool
-getTest = liftM mToBool $ eval $ ExpVn $ Lvn "$test" []
+getTest :: MonadState [RunState] m => m Bool
+getTest = mToBool `liftM` getLocal "$test" []
 
-setTest ::  (MonadState [RunState] m, MonadIO m) => Bool -> m ()
-setTest t = (exec $ return $ Set Nothing $ return $ (return $ Lvn "$test" [], ExpLit $ boolToM t) )>> return ()
+setTest :: MonadState [RunState] m => Bool -> m ()
+setTest =  change "$test" [] . boolToM
+
 
 eval :: (MonadState [RunState] m, MonadIO m) => Expression -> m MValue
 eval (ExpLit m) = return m
 eval (ExpVn vn) = do vn' <- normalize vn
                      case vn' of
-                       Lvn label subs -> do ma <- fetch label
-                                            mvs <- mapM eval subs
-                                            case mIndex ma mvs of
-                                              Just mv -> return mv
-                                              Nothing -> return $ String ""
+                       Lvn label subs -> do mvs <- mapM eval subs
+                                            getLocal label mvs
                        Gvn _ _        -> fail "Globals not yet implemented"
                        IndirectVn _ _ -> fail "normalized VNs should not be indirect"
 
@@ -254,16 +298,15 @@ eval (ExpBinop binop lexp rexp)
         Div         -> lv / rv
         Rem         -> lv `mRem` rv
         Quot        -> lv `mQuot` rv
-        Pow         -> lv ** rv
+        Pow         -> lv `mPow` rv
         And         -> lv `mAnd` rv
         Or          -> lv `mOr` rv
-        Equal       -> lv `mEqual` rv
+        Equal       -> boolToM $ lv == rv
         LessThan    -> lv `mLT` rv
         GreaterThan -> lv `mGT` rv
         Follows     -> lv `follows` rv
         Contains    -> lv `contains` rv
         SortsAfter  -> boolToM $ lv > rv
 eval (Pattern _ _)   = fail "Can't evaluate pattern matches"
-eval (FunCall _ _ _) = fail "Can't evaluate function calls"
+eval (FunCall _ _ _) = undefined
 eval (BIFCall _ _)   = fail "Can't evaluate built-in function calls"
-
