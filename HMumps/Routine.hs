@@ -1,10 +1,9 @@
-{-# OPTIONS
+{-# OPTIONS_GHC
             -Wall
             -Werror
   #-}
 
-module HMumps.Routine(--Routine,
-                      Line,
+module HMumps.Routine(Line,
                       File,
                       OldFile,
                       Routine,
@@ -48,6 +47,17 @@ replaceEmptyDos cmds oldlines =
        contents = transform $ takeWhile (\(_,n,_) -> n >= 0) $ fmap (\(x,n,y) -> (x,n-1,y)) oldlines
    in  fmap helper cmds
 
+-- who needs data structures?
 pack :: File -> Routine
-pack = undefined
-
+pack [] = const Nothing
+pack (x:xs) = let (tag,cmds) = x
+              in case tag of
+                   Nothing -> pack xs
+                   Just (name, args) -> \label -> 
+                     if label == name then Just (args,cmds:strip xs)
+                     else (pack xs) label
+strip :: File -> [Line]
+strip [] = []
+strip (x:xs) = let (_tag,line) = x in line : strip xs
+                    
+                   

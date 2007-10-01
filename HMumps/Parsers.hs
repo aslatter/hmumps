@@ -19,7 +19,8 @@ module HMumps.Parsers (
              arglist1,
              parse,
              parseFile,
-                      ) where
+             eol,
+                       ) where
 
 import Data.MValue
 import HMumps.Routine
@@ -27,9 +28,11 @@ import HMumps.SyntaxTree
 
 import Data.Char
 import Control.Monad
-import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec hiding (spaces)
 import Text.Regex
 
+spaces :: Parser ()
+spaces = (many $ oneOf " \t\r") >> return ()
 
 parseFile :: Parser OldFile
 parseFile = many $
@@ -37,6 +40,7 @@ parseFile = many $
                spaces
                linelevel <- length `liftM` many (do spaces; x <- char '.'; spaces; return x)
                cmds <- parseCommands
+               char '\n'
                return (tag, linelevel, cmds)
 
 parseTag :: Parser Tag
@@ -59,22 +63,20 @@ strip = (dropWhile whitespace) . reverse . (dropWhile whitespace) . reverse . (t
 
 -- |Parse Commands is fed a LINE of MUMPS (after line-level has been detrimined).
 parseCommands :: Parser [Command]
-parseCommands = do spaces
-                   (do x <- command;
-                       xs <- parseCommands;
-                       return (x:xs)) <|> (do comment;
-                                              return [])
-                                      <|> (eof >> return [])
-                                      <|> (char '\n' >> return [])
+parseCommands = (many $ do spaces
+                           command) 
+            <|> (do comment;
+                    return [])
+            <|> (eol >> return [])
+
 -- I think I do this wrong, because I'm not sure what happens on
 -- mal-formed input.  anyway, I think it's better than it was.
 
 
--- munch comments, including trailing newline (if any)
+-- munch comments
 comment :: Parser String
 comment = do char ';'
              cmt <- many $ noneOf "\n"
-             (char '\n' >> return ()) <|> return ()
              return cmt
 
 -- |Parses a single command.
@@ -112,7 +114,7 @@ parseDo = do stringOrPrefix1 "do"
              do char ' '
                 args <- mlist parseDoArg
                 return $ Do cond args
-              <|> do eof
+              <|> do eol
                      return $ Do cond []
 
 parseDoArg :: Parser DoArg
@@ -130,7 +132,7 @@ parseGoto = do stringOrPrefix1 "goto"
                do char ' '
                   args <- mlist parseGotoArg
                   return $ Goto cond args
-                <|> do eof
+                <|> do eol
                        return $ Goto cond []
 
 parseGotoArg :: Parser GotoArg
@@ -142,20 +144,20 @@ parseGotoArg = (try (do char '@'; expr <- parseExpAtom; return $ GotoArgIndirect
 parseElse :: Parser Command
 parseElse = do
   stringOrPrefix1 "else"
-  eof <|> do char ' '
-             eof <|> (char ' ' >> return ())
+  eol <|> do char ' '
+             eol <|> (char ' ' >> return ())
   return Else
 
 parseFor :: Parser Command
 parseFor = do stringOrPrefix1 "for"
-              (eof >> return ForInf)
+              (eol >> return ForInf)
                <|>
                 (do char ' '
                     (do vn <- parseLvn
                         char '='
                         arg <- forArg
                         return $ For vn arg)
-                      <|> (do eof <|> (char ' ' >> return ())
+                      <|> (do eol <|> (char ' ' >> return ())
                               return ForInf))
 
  where forArg :: Parser ForArg
@@ -189,7 +191,7 @@ parseHalt = do
 parseIf :: Parser Command
 parseIf = do stringOrPrefix1 "if"
              (char ' ' >> If `liftM` mlist parseExp)
-              <|> (eof >> (return $ If []))
+              <|> (eol >> (return $ If []))
 
 parseKill :: Parser Command
 parseKill = do 
@@ -198,7 +200,7 @@ parseKill = do
   (do char ' '
       args <- mlist parseKillArg
       return $ Kill cond args)
-   <|> (eof >> (return $ Kill cond []))
+   <|> (eol >> (return $ Kill cond []))
 
 parseMerge :: Parser Command               
 parseMerge = do stringOrPrefix1 "merge"
@@ -218,7 +220,7 @@ parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
               cond <- postCondition
               (char ' ' >>  New cond `liftM` (mlist parseNewArg))
-               <|> (eof >> (return $ New cond []))
+               <|> (eol >> (return $ New cond []))
 
 parseNewArg :: Parser NewArg
 parseNewArg = (do char '('
@@ -232,9 +234,10 @@ parseQuit :: Parser Command
 parseQuit = do stringOrPrefix1 "quit"
                return Quit `ap` postCondition `ap` quitArg
  where quitArg = (char ' ' >> (Just `liftM` parseExp <|> (char ' ' >> return Nothing)))
-             <|> (eof >> return Nothing)
+             <|> (eol >> return Nothing)
 
-          
+eol :: Parser ()
+eol = notFollowedBy $ noneOf "\n"
 
 parseRead :: Parser Command
 parseRead = do stringOrPrefix1 "read"
@@ -244,7 +247,6 @@ parseRead = do stringOrPrefix1 "read"
                case last args of
                  WriteExpression (ExpVn vn) -> return $ Read cond (init args) vn
                  _ -> fail "last argument to READ must be a variable name"
-
 
 
 parseSet :: Parser Command

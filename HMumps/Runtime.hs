@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Werror #-}
+{-# OPTIONS_GHC -Wall -Werror -fglasgow-exts #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module HMumps.Runtime(RunState(..),
@@ -8,7 +8,9 @@ module HMumps.Runtime(RunState(..),
                       exec,
                       Normalizable(..),
                       setX, setY,
-                      addX, addY
+                      addX, addY,
+                      runFunctionCall,
+                      -- RunMonad, RunStateMonad,
                      )
 where
 
@@ -29,10 +31,13 @@ import Control.Monad.Maybe
 import System(exitWith)
 import System.Exit(ExitCode(..))
 
+type RunStateMonad a = MonadState [RunState] m => m a
+type RunMonad a      = (MonadIO m, MonadState [RunState] m) => m a
+
 -- |Anything you may ever want to strip indirection off of should
 --  be an instance of this class
 class Normalizable a where
-    normalize :: (MonadState [RunState] m, MonadIO m) => a -> m a
+    normalize :: a -> RunMonad a
 
 instance Normalizable Vn where
     normalize (IndirectVn expr subs)
@@ -93,7 +98,7 @@ fetch' str xs = join . fst $ foldr helper (Nothing,str) [x | Just x <- fmap env 
                                                              Nothing      -> (Nothing, name)
 
 -- |Returns the MArray associated with the named local var, or the empty MArray
-fetch :: MonadState [RunState] m => String -> m MArray
+fetch :: String -> RunStateMonad MArray
 fetch str = do result <- (fetch' str) `liftM` get
                case result of
                   Just x  -> return x
@@ -189,6 +194,19 @@ exec (cmd:cmds) = case cmd of
                                   if mToBool mv
                                    then liftIO (exitWith ExitSuccess) >> return Nothing
                                    else exec cmds
+   Quit cond arg -> do case cond of
+                         Nothing   -> case arg of
+                                        Nothing   -> return $ Just Nothing
+                                        Just expr -> do mv <- eval expr
+                                                        return $ Just $ Just mv
+                         Just cond' -> do cond'' <- eval cond'
+                                          if mToBool cond''
+                                           then case arg of
+                                                Nothing   -> return $ Just Nothing
+                                                Just expr -> do mv <- eval expr
+                                                                return $ Just $ Just mv
+                                           else return Nothing
+
    c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)) >> return Nothing
 
 set :: (MonadState [RunState] m, MonadIO m) => [SetArg] -> m ()
@@ -308,5 +326,52 @@ eval (ExpBinop binop lexp rexp)
         Contains    -> lv `contains` rv
         SortsAfter  -> boolToM $ lv > rv
 eval (Pattern _ _)   = fail "Can't evaluate pattern matches"
-eval (FunCall _ _ _) = undefined
+eval (FunCall label routine args) = case routine of
+                                      [] -> fail "local calls not yet supported"
+                                      _  -> remoteCall label routine args
 eval (BIFCall _ _)   = fail "Can't evaluate built-in function calls"
+
+remoteCall :: (MonadIO m, MonadState [RunState] m) =>
+                Name -> Name -> [FunArg] -> m MValue
+remoteCall label routine args = let filename = routine ++ ".hmumps" in
+  do text <- liftIO $ readFile filename
+     case parse parseFile filename text of
+       Left a ->  (fail . show) a
+       Right f -> let r = pack $ transform f in
+                  case r label of
+                    Nothing -> fail $ "Noline: " ++ label ++ "^"  ++ routine
+                    Just (argnames, cmds) -> funcall args argnames cmds r
+
+funcall :: [FunArg] -> [Name] -> [Line] -> Routine -> RunMonad MValue
+funcall args' argnames cmds r = 
+    let (pairs, remainder) = zipRem args' argnames in
+    case remainder of
+      Just (Left _) -> fail "Supplied too many parameters to function"
+      _ -> do m <- foldM helper empty pairs
+              let newframe = RunState (Just $ Env NormalEnv m) r
+              modify (newframe:)
+              x <- runFunctionCall cmds
+              case x of
+                Just mv -> modify tail >> return mv
+                Nothing -> fail "Function quit without returning a value"
+
+ where helper :: Map Name EnvEntry -> (FunArg, Name) -> RunMonad (Map Name EnvEntry)
+       helper m (arg,name) = case arg of
+             FunArgExp expr -> do mval <- eval expr
+                                  let entry = Entry $ arrayUpdate mEmpty [] mval
+                                  return $ insert name entry m
+             FunArgName name' -> return $ insert name (LookBack $ Just name') m
+             
+runFunctionCall :: [Line] -> RunMonad (Maybe MValue)
+runFunctionCall [] = return Nothing
+runFunctionCall (x:xs) = do result <- exec x
+                            case result of
+                              Nothing -> runFunctionCall xs
+                              Just x' -> return x'
+
+zipRem :: [a] -> [b] -> ([(a,b)],Maybe (Either [a] [b]))
+zipRem [] []         = ([],Nothing)
+zipRem [] xs         = ([],Just $ Right xs)
+zipRem xs []         = ([],Just $ Left  xs)
+zipRem (x:xs) (y:ys) = let (pairs, remainder) = zipRem xs ys
+                       in ((x,y):pairs,remainder)

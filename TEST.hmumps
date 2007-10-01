@@ -1,0 +1,2 @@
+TEST     Write "Hello, world!",! Quit
+ADD(x,y) Quit x+y
