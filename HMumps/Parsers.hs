@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror #-}
+{-# OPTIONS_GHC -Wall -Werror #-}
 
 -- |This module contains everything needed to do the initial
 -- parsing of either a MUMPS routine or MUMPS commands
@@ -18,11 +18,11 @@ module HMumps.Parsers (
              arglist,
              arglist1,
              parse,
-             --parseFile
+             parseFile,
                       ) where
 
 import Data.MValue
--- import HMumps.Routine
+import HMumps.Routine
 import HMumps.SyntaxTree
 
 import Data.Char
@@ -31,15 +31,19 @@ import Text.ParserCombinators.Parsec
 import Text.Regex
 
 
-{-
 parseFile :: Parser OldFile
 parseFile = many $
-       do tag <- many $ noneOf "\t\n"
-          char '\t'
-          linelevel <- length `liftM` many (do spaces; x <- char '.'; spaces; return x)
-          cmds <- parseCommands
-          return (tag, linelevel, cmds) 
--}
+            do tag <- parseTag
+               spaces
+               linelevel <- length `liftM` many (do spaces; x <- char '.'; spaces; return x)
+               cmds <- parseCommands
+               return (tag, linelevel, cmds)
+
+parseTag :: Parser Tag
+parseTag = do name <- parseValidName
+              args <- arglist parseValidName
+              return $ Just (name,args)              
+       <|> return Nothing
 
 -- | The "initLex" function takes in a string representing all of the code
 -- to be parsed (say, an entire routine) and:

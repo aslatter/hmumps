@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror #-}
+{-# OPTIONS_GHC -Wall -Werror #-}
 
 -- |This module defines all of the data types that make up parsed
 -- MUMPS syntax.

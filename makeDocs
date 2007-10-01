@@ -2,4 +2,4 @@
 
 # assumes that the "docs" directory exists.
 
-find . | egrep "\.hs$" | egrep -v "_darcs|Testing|#|Templates|Main" | xargs haddock -o docs -h
+find . | egrep "\.hs$" | egrep -v "_darcs|Testing|#|Templates|Main|Types" | xargs haddock -o docs -h

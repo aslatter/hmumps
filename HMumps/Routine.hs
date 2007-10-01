@@ -8,7 +8,7 @@ module HMumps.Routine(--Routine,
                       File,
                       OldFile,
                       Routine,
-                      --Tag,
+                      Tag,
                       transform,
                       pack)
  where
