@@ -40,6 +40,7 @@ parseFile = many $
                spaces
                linelevel <- length `liftM` many (do spaces; x <- char '.'; spaces; return x)
                cmds <- parseCommands
+               optional comment
                char '\n'
                return (tag, linelevel, cmds)
 
@@ -63,11 +64,13 @@ strip = (dropWhile whitespace) . reverse . (dropWhile whitespace) . reverse . (t
 
 -- |Parse Commands is fed a LINE of MUMPS (after line-level has been detrimined).
 parseCommands :: Parser [Command]
-parseCommands = (many $ do spaces
-                           command) 
+parseCommands = (many $ do c <- command
+                           spaces
+                           return c)
             <|> (do comment;
                     return [])
             <|> (eol >> return [])
+            <|> (spaces >> parseCommands)
 
 -- I think I do this wrong, because I'm not sure what happens on
 -- mal-formed input.  anyway, I think it's better than it was.
@@ -233,11 +236,11 @@ parseNewArg = (do char '('
 parseQuit :: Parser Command
 parseQuit = do stringOrPrefix1 "quit"
                return Quit `ap` postCondition `ap` quitArg
- where quitArg = (char ' ' >> (Just `liftM` parseExp <|> (char ' ' >> return Nothing)))
+ where quitArg = (char ' ' >> (Just `liftM` parseExp <|> (eol >> return Nothing) <|> (char ' ' >> return Nothing)))
              <|> (eol >> return Nothing)
 
 eol :: Parser ()
-eol = notFollowedBy $ noneOf "\n"
+eol = notFollowedBy $ noneOf "\n;"
 
 parseRead :: Parser Command
 parseRead = do stringOrPrefix1 "read"

@@ -1,2 +1,13 @@
-TEST     Write "Hello, world!",! Quit
+TEST     Write "Hello, world!",! Quit ;comment
+
+ ;My first working function!
 ADD(x,y) Quit x+y
+
+ ; This one does weird things if you pass in 'a' by ref
+SET(a,b) Set a(b)=b
+         Quit 1
+
+ ; Go-go-gadget recursion
+FACT(x)  Quit:(x<2) 1
+         Quit x-1*x
+

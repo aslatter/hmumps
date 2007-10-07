@@ -327,9 +327,16 @@ eval (ExpBinop binop lexp rexp)
         SortsAfter  -> boolToM $ lv > rv
 eval (Pattern _ _)   = fail "Can't evaluate pattern matches"
 eval (FunCall label routine args) = case routine of
-                                      [] -> fail "local calls not yet supported"
+                                      [] -> localCall label args
                                       _  -> remoteCall label routine args
 eval (BIFCall _ _)   = fail "Can't evaluate built-in function calls"
+ 
+localCall :: Name -> [FunArg] -> RunMonad MValue
+localCall label args = do (r :: Routine) <- (tags . head) `liftM` get
+                          case r label of
+                            Nothing -> fail $ "Noline: " ++ label
+                            Just (argnames, cmds) -> funcall args argnames cmds r
+
 
 remoteCall :: (MonadIO m, MonadState [RunState] m) =>
                 Name -> Name -> [FunArg] -> m MValue
