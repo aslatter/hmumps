@@ -8,7 +8,7 @@ import Text.ParserCombinators.Parsec
 import System.IO
 import System.Console.Readline -- Note, uses GNU readline, under GPL
 import Control.Monad.State
---import Data.Map
+import Control.Monad.Error
 
 import HMumps.Runtime
 
@@ -32,18 +32,16 @@ loop = do line <- liftIO $ readline "> "
 interpreterCommands :: (MonadIO m, MonadState [RunState] m) => String -> m () -> m ()
 interpreterCommands "q" _    = return ()
 interpreterCommands "w" next = (liftIO $ putStrLn warranty) >> next
-{-interpreterCommands "lvns" next = do ev <- (env . head) `liftM` get
-                                     case ev of
-                                       NoFrame -> next
-                                       NormalFrame m -> mapM_ (liftIO . putStrLn) (keys m) >> next
-                                       StopFrame m -> mapM_ (liftIO . putStrLn) (keys m) >> next -}
 interpreterCommands str next = (liftIO $ putStrLn $ "Unkown interpreter command: " ++ str) >> next
 
 repl :: (MonadState [RunState] m, MonadIO m) => String -> m ()
 repl [] = return ()
 repl x = case parse parseCommands "" x of
            Left err -> liftIO $ putStrLn $ show err
-           Right xs -> exec xs >> liftIO (putChar '\n') >> setX 0 >> addY 1
+           Right xs -> do result <- runErrorT (exec xs >> liftIO (putChar '\n') >> setX 0 >> addY 1)
+                          case result of
+                            Right _ -> return ()
+                            Left str -> liftIO $ putStrLn str
 
 splash :: String
 splash = $(bakedString "SPLASH")
