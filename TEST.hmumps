@@ -9,5 +9,5 @@ SET(a,b) Set a(b)=b
 
  ; Go-go-gadget recursion
 FACT(x)  Quit:(x<2) 1
-         Quit x-1*x
+         Quit x*$$FACT(x-1)
 

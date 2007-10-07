@@ -78,12 +78,12 @@ data EnvEntry = LookBack (Maybe Name)
               | Entry MArray
 
 fetch' :: String -> [RunState] -> Maybe MArray
-fetch' str xs = join . fst $ foldr helper (Nothing,str) [x | Just x <- fmap env xs] where
+fetch' str xs = join . fst $ foldl helper (Nothing,str) [x | Just x <- fmap env xs] where
 
- helper :: Env -> (Maybe (Maybe MArray),Name) -> (Maybe (Maybe MArray), Name)
+ helper :: (Maybe (Maybe MArray),Name) -> Env -> (Maybe (Maybe MArray), Name)
 
- helper _ rhs@(Just _, _) = rhs
- helper (Env tag m) (_,name) = case tag of
+ helper rhs@(Just _, _) _ = rhs
+ helper (_,name) (Env tag m) = case tag of
                    NormalEnv -> case name `lookup` m of
                                   Nothing -> (Nothing, name)
                                   Just (Entry ma) -> (Just (Just ma), name)
