@@ -220,28 +220,28 @@ set ((vns,expr):ss) = do vns' <- mapM normalize vns
        setHelper _ (IndirectVn _ _) = fail "Variable name should be normalized"
 
 write :: (MonadIO m, MonadState [RunState] m) => [WriteArg] -> m ()
-write [] = return ()
-write (wa:ws) = do wa' <- normalize wa
-                   case wa' of
-                     WriteExpression expr -> do m <- eval expr
-                                                let String s = mString m
-                                                liftIO $ putStr s
-                                                addX $ fromIntegral $ length s
-                                                write ws
-                     WriteFormat fs -> writeFormat fs >> write ws
-                     WriteIndirect _ -> fail "write argument should be normalized"
+write = mapM_ f
+ where f wa = do
+         wa' <- normalize wa
+         case wa' of
+           WriteExpression expr -> do m <- eval expr
+                                      let String s = mString m
+                                      liftIO $ putStr s
+                                      addX $ fromIntegral $ length s
+           WriteFormat fs -> writeFormat fs
+           WriteIndirect _ -> fail "write argument should be normalized"
 
 writeFormat :: (MonadIO m, MonadState [RunState] m)=> [WriteFormatCode] -> m ()
-writeFormat [] = return ()
-writeFormat (Formfeed : fs) = liftIO (putChar '\f') >> writeFormat fs >> setY 1
-writeFormat (Newline  : fs) = liftIO (putChar '\n') >> writeFormat fs >> setX 1 >> addY 1
-writeFormat (Tab n    : fs) = do x <- getX
-                                 if x >= n'
-                                  then writeFormat fs
-                                  else do liftIO (putStr $ (replicate . floor) (n'-x) ' ')
-                                          setX n'
-                                          writeFormat fs
- where n' = fromIntegral n
+writeFormat = mapM_ f
+ where
+  f Formfeed = liftIO (putChar '\f') >> setY 1
+  f Newline  = liftIO (putChar '\n') >> setX 1 >> addY 1
+  f (Tab n)  = do x <- getX
+                  let n' = fromIntegral n
+                  if x >= n'
+                   then return ()
+                   else do liftIO (putStr $ (replicate . floor) (n'-x) ' ')
+                           setX n'
 
 setX :: MonadState [RunState] m => MValue -> m ()
 setX = change "$x" []
@@ -325,7 +325,7 @@ eval (ExpBinop binop lexp rexp)
         Follows     -> lv `follows` rv
         Contains    -> lv `contains` rv
         SortsAfter  -> boolToM $ lv > rv
-eval (Pattern _ _)   = fail "Can't evaluate pattern matches"
+-- eval (Pattern _ _)   = fail "Can't evaluate pattern matches"
 eval (FunCall label routine args) = case routine of
                                       [] -> localCall label args
                                       _  -> remoteCall label routine args

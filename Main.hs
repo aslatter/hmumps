@@ -2,15 +2,14 @@
 
 module Main where
 
-import HMumps.Parsers
-
-import Text.ParserCombinators.Parsec
+-- import Text.Parsec
 import System.IO
 import System.Console.Readline -- Note, uses GNU readline, under GPL
 import Control.Monad.State
 import Control.Monad.Error
 
 import HMumps.Runtime
+import HMumps.Parsers
 
 import Templates
 

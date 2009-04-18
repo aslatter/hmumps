@@ -36,7 +36,7 @@ mIndex (MArray _ map')  (x:xs) = do vc <- lookup x map'
 -- updated array.
 arrayUpdate :: MArray -> [MValue] -> MValue -> MArray
 arrayUpdate (MArray  _ map') [] v' =  MArray (Just v') map'
-arrayUpdate ma@(MArray _ map') (sub:subs) v' =  MArray (Just v') map'' where
+arrayUpdate ma@(MArray n map') (sub:subs) v' =  MArray n map'' where
     
     map'' :: Map MValue MArray
     map'' = insert sub ma' map'

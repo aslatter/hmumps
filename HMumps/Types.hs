@@ -3,9 +3,8 @@
 
 module HMumps.Types where
 
-import Text.Regex
+-- import Text.Regex
 import Data.MValue
-
 
 type Routine     = String -> Maybe Subroutine
 type Line        = [Command]
@@ -79,41 +78,41 @@ data Command = Break (Maybe Condition)
              -- The following commands will not have parsers written for them
              | Nop
              | Block (Maybe Condition) Routine [[Command]]
- deriving Show
+ deriving (Show)
 
 
 data DoArg = DoArg (Maybe Condition) EntryRef [FunArg]
            | DoArgIndirect Expression
- deriving Show
+ deriving (Show)
 
 data ForArg = ForArg1 Expression
             | ForArg2 Expression Expression
             | ForArg3 Expression Expression Expression
- deriving Show
+ deriving (Show)
 
 data GotoArg = GotoArg (Maybe Condition) EntryRef
              | GotoArgIndirect Expression
- deriving Show
+ deriving (Show)
 
 -- | "EntryRef" is a thing that can be pointed to by a DO or a GOTO,
 -- it may be specify a subroutine or a routine. This datatype should
 -- be equivalent to the "entryref" of the MUMPS spec.
 data EntryRef = Routine Routineref
               | Subroutine Label (Maybe Integer) (Maybe Routineref)
- deriving Show
+ deriving (Show)
 
 -- | The DLabel is tag pointed to by an enytryref, if the entryref
 -- specifies a label.
 data Label = Label Name
             | LabelInt Integer -- ^Labels can be given as integers
             | LabelIndirect Expression
- deriving Show
+ deriving (Show)
 
 -- | The Routineref specifies a routine and an optional
 -- environment.  May be indirect.
 data Routineref = Routineref Name
                 | RoutinerefIndirect Expression
- deriving Show
+ deriving (Show)
 
 type Condition = Expression
 type Subscript = Expression
@@ -128,12 +127,12 @@ type Subscript = Expression
 data KillArg = KillSelective Vn
              | KillExclusive [Name]
              | KillIndirect  Expression
- deriving Show
+ deriving (Show)
 
 -- |An argument to merge specifies a source and a target.
 -- See 8.2.13
 data MergeArg = MergeArg Vn Vn | MergeArgIndirect Expression
- deriving Show
+ deriving (Show)
 
 
 -- New should probably be broken up into more primative commands
@@ -146,17 +145,17 @@ data MergeArg = MergeArg Vn Vn | MergeArgIndirect Expression
 data NewArg = NewSelective Name
             | NewExclusive [Name]
             | NewIndirect  Expression
- deriving Show
+ deriving (Show)
 
 data WriteArg = WriteExpression Expression
               | WriteFormat [WriteFormatCode]
               | WriteIndirect Expression
- deriving Show
+ deriving (Show)
 
 data WriteFormatCode = Formfeed
                      | Newline
                      | Tab Int
- deriving Show
+ deriving (Show)
 
 -- |Vn describes the name of a variable, which may be local, global,
 -- or indirect.  Each form may optionally indicate a Subscript.
@@ -164,13 +163,13 @@ data WriteFormatCode = Formfeed
 data Vn = Lvn Name [Subscript] -- these two will only ever
         | Gvn Name [Subscript] -- be direct names.  Maybe.
         | IndirectVn Expression [Subscript]
- deriving Show
+ deriving (Show)
 
 -- | A funarg can be an expression, or the name of a local to pass
 -- in by reference.
 data FunArg = FunArgExp Expression
             | FunArgName Name
- deriving Show
+ deriving (Show)
 
 type Name = String
 
@@ -196,18 +195,22 @@ data Expression
     | FunCall  String String [FunArg]
     -- |A pattern match is similar to a regular expression match.
     -- This binary operator returns either 0 or 1.
-    | Pattern Expression Regex
- deriving Show
+--    | Pattern Expression Regex
+ deriving (Show)
 
+type PatCode = ()
+
+{-
 instance Show Regex where
     show _ = "<Regex>"
+-}
 
 data UnaryOp = UNot | UPlus | UMinus
- deriving Show
+ deriving (Show)
+
 data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow | And | Or
              | Equal | LessThan | GreaterThan | Follows | Contains | SortsAfter
- deriving Show
--- missing a few binops.  not sure where ], [, and ]] are in the spec
+ deriving (Show)
 
 
 -- I don't know why I hadn't defined this earlier.

@@ -12,7 +12,8 @@ import Char
 import Data.Ratio
 import qualified Data.List as L
 import Test.QuickCheck
-
+import Data.Generics
+import Data.Typeable
 
 -- The MUMPS value type - is transparently a string or int
 -- or float.
@@ -25,7 +26,7 @@ import Test.QuickCheck
 data MValue = String String
             | Number Integer
             | Float  Double
- deriving (Show)
+ deriving (Show,Data,Typeable)
 
 -- |I think this is proper MUMPS equality.
 -- The key thing to watch out for is that

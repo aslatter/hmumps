@@ -28,8 +28,9 @@ import HMumps.SyntaxTree
 
 import Data.Char
 import Control.Monad
-import Text.ParserCombinators.Parsec hiding (spaces)
-import Text.Regex
+import Text.Parsec hiding (spaces)
+import Text.Parsec.String
+-- import Text.Regex
 
 spaces :: Parser ()
 spaces = (many $ oneOf " \t\r") >> return ()
@@ -308,9 +309,8 @@ parseExp = do let parseWrapper :: Parser ((Expression -> Expression) -> Expressi
                                           expr <- parseExpAtom;
                                           return $ wrapper  $ \x -> ExpBinop binop x expr)
                                       <|>(do char '?';
-                                             pat <- parsePattern;
-                                             return $ wrapper $ \x -> Pattern x pat))
-
+                                             pat <- undefined;
+                                             return $ pat))
               exp1 <- parseExpAtom
               tails <- many parseTailItem
 
@@ -333,14 +333,22 @@ parseExpFuncall = do char '$'
                      (do name <- parseValidName
                          args <- arglist parseExp
                          return $ BIFCall name args)
-                      <|> (do char '$'
-                              name1 <- parseValidName
-                              (do char '^'
-                                  name2 <- parseValidName
-                                  args <- arglist parseFunArg
-                                  return $ FunCall name1 name2 args)
-                               <|> (do args <- arglist parseFunArg
-                                       return $ FunCall name1 "" args))
+                      <|> parseExFun
+
+parseExFun :: Parser Expression
+parseExFun = do
+  char '$'
+  (do char '^'
+      name2 <- parseValidName
+      args  <- arglist parseFunArg
+      return $ FunCall [] name2 args)
+   <|> (do name1 <- parseValidName
+           (do char '^'
+               name2 <- parseValidName
+               args <- arglist parseFunArg
+               return $ FunCall name1 name2 args)
+             <|> (do args <- arglist parseFunArg
+                     return $ FunCall name1 "" args))
                       
 
 parseSubExp :: Parser Expression
@@ -387,8 +395,6 @@ parseBinop = (char '_'  >> return Concat)
          <|> (char '['  >> return Contains)
          <?> "binary operator"
 
-parsePattern :: Parser Regex
-parsePattern = error "No pattern parser"
 
 -- Used in DoArg and GotoArg
 parseRoutineRef :: Parser Routineref
