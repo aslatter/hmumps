@@ -1,10 +1,11 @@
-{-# OPTIONS -Wall -Werror -fglasgow-exts -fth #-}
+{-# OPTIONS -Wall -Werror -fglasgow-exts #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Main where
 
 -- import Text.Parsec
 import System.IO
-import System.Console.Readline -- Note, uses GNU readline, under GPL
+import System.Console.Haskeline.Class
 import Control.Monad.State
 import Control.Monad.Error
 
@@ -14,14 +15,18 @@ import HMumps.Parsers
 import Templates
 
 main :: IO ()
-main = hSetBuffering stdout NoBuffering >> putStrLn splash >> runStateT loop emptyState >> return ()
+main = do
+  -- hSetBuffering stdout NoBuffering
+  putStrLn splash
+  runHaskelineT defaultSettings $ runStateT loop emptyState
+  return ()
 
-loop :: (MonadState [RunState] m, MonadIO m) => m ()
-loop = do line <- liftIO $ readline "> "
+loop :: (MonadState [RunState] m, MonadHaskeline m) => m ()
+loop = do line <- getInputLine "> "
           case line of
             Just x -> if x == ""
                       then loop
-                      else do liftIO $ addHistory x
+                      else 
                               case x of
                                 '!':xs -> interpreterCommands xs loop
 	                        _ -> (repl . strip) x >> loop

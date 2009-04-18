@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances -Wall -Werror #-}
+{-# OPTIONS -fglasgow-exts -Wall -Werror #-}
+{-# LANGUAGE UndecidableInstances#-}
  
 module Control.Monad.Maybe
   (runMaybeT,
