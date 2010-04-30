@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror -fglasgow-exts #-}
+{-# OPTIONS -Wall -fglasgow-exts #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Main where

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Werror -fglasgow-exts #-}
+{-# OPTIONS_GHC -Wall -fglasgow-exts #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module HMumps.Runtime(RunState(..),

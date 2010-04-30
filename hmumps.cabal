@@ -4,7 +4,9 @@ License:             GPL
 License-file:        LICENSE
 Author:              Antoine Latter
 Maintainer:          aslatter@gmail.com
-Build-Depends:       base, haskell98, regex-compat, parsec
+Build-Depends:       base == 4.*, haskell98, regex-compat, parsec == 3.1.*,
+                     QuickCheck == 1.*, mtl == 1.1.*, containers == 0.3.*,
+                     haskeline == 0.6.*, syb == 0.1.*
 
 Executable:          hmumps
 Main-is:             Main.hs

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall -Werror #-}
+{-# OPTIONS_GHC -Wall #-}
 
 -- |This module contains everything needed to do the initial
 -- parsing of either a MUMPS routine or MUMPS commands
