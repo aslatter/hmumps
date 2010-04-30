@@ -189,7 +189,7 @@ data Expression
     | ExpBinop BinOp Expression Expression
     -- |MUMPS provides many builtin functions, some of which
     -- are of arity zero (so are more like builtin constants)
-    | BIFCall String [Expression]
+    | ExpBifCall BifCall
     -- |You can even call your own functions!  Locally defined
     -- functions need not specify the parent routine.
     | FunCall  String String [FunArg]
@@ -212,6 +212,12 @@ data BinOp   = Concat | Add | Sub | Mult | Div | Rem | Quot | Pow | And | Or
              | Equal | LessThan | GreaterThan | Follows | Contains | SortsAfter
  deriving (Show)
 
+data BifCall
+    = BifChar [Expression]
+    | BifX
+    | BifY
+    | BifTest
+ deriving Show
 
 -- I don't know why I hadn't defined this earlier.
 -- I'm glad I hadn't - it liekly would've been

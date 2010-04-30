@@ -24,6 +24,7 @@ module HMumps.SyntaxTree (
                 Name,
                 -- ** Expressions
                 Expression(..),
+                BifCall(..),
                 Condition,
                 Subscript,
                 UnaryOp(..),

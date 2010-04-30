@@ -329,11 +329,26 @@ parseExpVn = do vn <- parseVn
                 return $ ExpVn vn
 
 parseExpFuncall :: Parser Expression
-parseExpFuncall = do char '$'
-                     (do name <- parseValidName
-                         args <- arglist parseExp
-                         return $ BIFCall name args)
-                      <|> parseExFun
+parseExpFuncall = char '$' >>
+                  (parseBif <|> parseExFun)
+
+parseBif :: Parser Expression
+parseBif = ExpBifCall `liftM` (parseBifC <|> parseBifX <|> parseBifY <|> parseBifT)
+
+parseBifC :: Parser BifCall
+parseBifC = do
+  stringOrPrefix1 "char"
+  args <- arglist1 parseExp
+  return $ BifChar args
+
+parseBifX :: Parser BifCall
+parseBifX = char 'x' >> return BifX
+
+parseBifY :: Parser BifCall
+parseBifY = char 'y' >> return BifY
+
+parseBifT :: Parser BifCall
+parseBifT = stringOrPrefix1 "test" >> return BifTest
 
 parseExFun :: Parser Expression
 parseExFun = do

@@ -17,6 +17,7 @@ where
 import Prelude hiding (lookup,break,map)
 import qualified Prelude as P
 
+import Data.Char (chr)
 import Data.Map
 import Data.MValue
 import Data.MArray
@@ -329,7 +330,7 @@ eval (ExpBinop binop lexp rexp)
 eval (FunCall label routine args) = case routine of
                                       [] -> localCall label args
                                       _  -> remoteCall label routine args
-eval (BIFCall _ _)   = fail "Can't evaluate built-in function calls"
+eval (ExpBifCall bif)   = evalBif bif
  
 localCall :: Name -> [FunArg] -> RunMonad MValue
 localCall label args = do (r :: Routine) <- (tags . head) `liftM` get
@@ -348,6 +349,20 @@ remoteCall label routine args = let filename = routine ++ ".hmumps" in
                   case r label of
                     Nothing -> fail $ "Noline: " ++ label ++ "^"  ++ routine
                     Just (argnames, cmds) -> funcall args argnames cmds r
+
+evalBif :: BifCall -> RunMonad MValue
+evalBif (BifChar args') = do
+  args <- mapM eval args'
+  let str = fmap (chr . asInt) args
+  return $ String str
+
+ where asInt :: MValue -> Int
+       asInt v = let (Number i) = mNum v in fromInteger i
+evalBif BifX = getX
+evalBif BifY = getY
+evalBif BifTest = boolToM `liftM` getTest
+evalBif bif = fail $ "oops! I don't know what to do with " ++ show bif
+
 
 funcall :: [FunArg] -> [Name] -> [Line] -> Routine -> RunMonad MValue
 funcall args' argnames cmds r = 
