@@ -333,7 +333,7 @@ parseExpFuncall = char '$' >>
                   (parseBif <|> parseExFun)
 
 parseBif :: Parser Expression
-parseBif = ExpBifCall `liftM` (parseBifC <|> parseBifX <|> parseBifY <|> parseBifT)
+parseBif = ExpBifCall `liftM` (parseBifC <|> parseBifX <|> parseBifY <|> parseBifT <|> parseBifO)
 
 parseBifC :: Parser BifCall
 parseBifC = do
@@ -349,6 +349,21 @@ parseBifY = char 'y' >> return BifY
 
 parseBifT :: Parser BifCall
 parseBifT = stringOrPrefix1 "test" >> return BifTest
+
+parseBifO :: Parser BifCall
+parseBifO = do
+  stringOrPrefix1 "order"
+  (vn, dir) <- parse2args parseVn parseExp
+  return $ BifOrder vn dir
+
+-- | parse two function arguments where the second is optional
+parse2args :: Parser a -> Parser b -> Parser (a, Maybe b)
+parse2args a1 a2 = do
+  char '('
+  v1 <- a1
+  v2 <- ((char ',' >> liftM Just a2) <|> return Nothing)
+  char ')'
+  return (v1, v2)
 
 parseExFun :: Parser Expression
 parseExFun = do
@@ -390,7 +405,6 @@ parseStringLit = do char '"'
                     char '"'
                     (return . ExpLit . String) xs
 
--- I consider every "try" in a parsec parser a personal failure.
 
 -- No guarantees that the list of binops is complete.
 parseBinop :: Parser BinOp

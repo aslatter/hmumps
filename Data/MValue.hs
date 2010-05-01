@@ -14,6 +14,7 @@ import qualified Data.List as L
 import Test.QuickCheck
 import Data.Generics
 import Data.Typeable
+import Data.String
 
 -- The MUMPS value type - is transparently a string or int
 -- or float.
@@ -64,6 +65,9 @@ instance Ord MValue where
     compare (String s1) (String s2) = compare s1 s2
     compare (String s1) mv = let (String s2) = mString mv in compare s1 s2
     compare mv (String s2) = let (String s1) = mString mv in compare s1 s2
+
+instance IsString MValue where
+    fromString str = String str
 
 follows :: MValue -> MValue -> MValue
 follows a b = boolToM $ follows' a b

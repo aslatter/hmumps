@@ -217,7 +217,9 @@ data BifCall
     | BifX
     | BifY
     | BifTest
+    | BifOrder Vn (Maybe Expression)
  deriving Show
+
 
 -- I don't know why I hadn't defined this earlier.
 -- I'm glad I hadn't - it liekly would've been

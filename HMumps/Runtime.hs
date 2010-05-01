@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fglasgow-exts #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 
 module HMumps.Runtime(RunState(..),
                       Env(..),
@@ -270,6 +270,10 @@ getLocal label subs = do ma <- fetch label
                            Just mv -> mv
                            Nothing -> String ""                         
 
+getLocalArray :: MonadState [RunState] m => String -> [MValue] -> m (Maybe MArray)
+getLocalArray label subs = do
+  ma <- fetch label
+  return $ mSubArray ma subs
 
 forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
 forInf ((Quit cond Nothing):xs) = case cond of
@@ -361,8 +365,37 @@ evalBif (BifChar args') = do
 evalBif BifX = getX
 evalBif BifY = getY
 evalBif BifTest = boolToM `liftM` getTest
+evalBif (BifOrder vn' expForward) = do
+  vn <- normalize vn'
+  case vn of
+    Lvn label subs' -> do
+            subs <- mapM eval subs'
+            case unSnoc subs of
+              Nothing -> fail "Cannot $ORDER with no subscripts"
+              Just (rest,last)
+                  -> do
+                ma <- getLocalArray label rest
+                case ma of
+                  Nothing -> return ""
+                  Just a -> do
+                      forward <- case expForward of
+                                   Nothing -> return True
+                                   Just ex -> mToBool `liftM` eval ex
+                      case order a forward last of
+                        Nothing -> return ""
+                        Just v -> return v
+    Gvn{} -> fail "$ORDER on globals is not supported"
+
 evalBif bif = fail $ "oops! I don't know what to do with " ++ show bif
 
+
+-- | returns the front of a list plus the last element.
+-- returns Nothing if the list is empty.
+unSnoc :: [a] -> Maybe ([a],a)
+unSnoc [] = Nothing
+unSnoc (x:xs) = Just $ case unSnoc xs of
+                         Nothing -> ([],x)
+                         Just ~(ys,y) -> (x:ys,y)
 
 funcall :: [FunArg] -> [Name] -> [Line] -> Routine -> RunMonad MValue
 funcall args' argnames cmds r = 

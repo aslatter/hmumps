@@ -4,11 +4,12 @@ module Data.MArray (
                MArray,
                mEmpty,
                mIndex,
+               mSubArray,
                arrayUpdate,
                order
               ) where
 
--- Copyright 2007 Antoine Latter
+-- Copyright 2007, 2010 Antoine Latter
 -- aslatter@gmail.com
 
 import Data.Map
@@ -34,8 +35,15 @@ mIndex :: Monad m => MArray -> [MValue] -> m MValue
 mIndex (MArray v _map) []     = case v of
                                   Nothing -> fail "mIndex: value not set at specified index"
                                   Just mv -> return mv
-mIndex (MArray _ map')  (x:xs) = do vc <- lookup' x map'
-                                    mIndex vc xs
+mIndex (MArray _ map')  (x:xs) = do
+  vc <- lookup' x map'
+  mIndex vc xs
+
+mSubArray :: Monad m => MArray -> [MValue] -> m MArray
+mSubArray m [] = return m
+mSubArray (MArray _ map') (x:xs) = do
+  vc <- lookup' x map'
+  mSubArray vc xs
 
 -- |Takes an array, subscripts and a value and returns the
 -- updated array.
@@ -60,31 +68,18 @@ nextArray v (MArray _v map') = case lookup v map' of
 -- |Returns the next highest subscript for the last
 -- subscript provided.  Passing false for the bool
 -- gives the next lowest, instead.
--- I'll be re-writing this soon (I hope!), including
--- the type-sugnature.
-order :: Monad m => MArray -- ^The supplied array
-      -> Bool -- ^Set to False to search backwards
-      -> [MValue] -- ^The supplied subscript
-      -> m MValue -- ^The next value for the last subscript provided
-order (MArray _ map') forward (mv:[]) = let (map1, map2) = split mv map' in
-  if forward
-     then if null map2 then fail "Order: no higher indices"
-          else let (k,_) = findMin map2 in return k
-     else if null map1 then fail "Order: no lower indices"
-          else let (k,_) = findMax map1 in return k
-order (MArray _ map') forward (mv:ms) = do vc <- lookup' mv map'
-                                           order vc forward ms
-order _ _ [] = undefined -- some sort of base case.  this function is all messed up :-(
+order :: MArray -> Bool -> MValue -> Maybe MValue
+order (MArray _ map') forward mv =
+    let (mapBack, mapForward) = split mv map'
 
-{-
-instance (Arbitrary a) => Arbitrary (Maybe a) where
-    arbitrary            = sized arbMaybe
-        where
-          arbMaybe 0 = return Nothing
-          arbMaybe n = fmap Just (resize (n-1) arbitrary)
-    coarbitrary Nothing  = variant 0
-    coarbitrary (Just x) = variant 1 . coarbitrary x
--}
+        map'' | forward = mapForward
+              | otherwise = mapBack
+
+        findElem | forward = findMin
+                 | otherwise = findMax
+
+    in if null map'' then Nothing
+       else let (k, _) = findElem map'' in Just k 
 
 instance Arbitrary MArray where
     arbitrary = do

@@ -31,7 +31,7 @@ module HMumps.SyntaxTree (
                 BinOp(..),
                ) where
 
--- Copyright 2007 Antoine Latter
+-- Copyright 2007-2010 Antoine Latter
 -- aslatter@gmail.com
 
 import HMumps.Types
