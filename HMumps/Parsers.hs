@@ -98,7 +98,8 @@ command = parseBreak
       <|> parseQuit
       <|> parseRead
       <|> parseSet
-      <|> parseWrite <?> "MUMPS command"
+      <|> parseWrite
+      <|> parseXecute <?> "MUMPS command"
 
 parseBreak :: Parser Command
 parseBreak = do stringOrPrefix1 "break"
@@ -280,6 +281,14 @@ parseWriteFormatCode = (char '#' >> return Formfeed)
                    <|> (char '?' >> return Tab `ap` parseInt)
  where parseInt :: Parser Int
        parseInt = return read `ap` many1 (oneOf ['0'..'9'])
+
+parseXecute :: Parser Command
+parseXecute = do
+  stringOrPrefix1 "x"
+  cond <- postCondition
+  char ' '
+  arg <- parseExp
+  return $ Xecute cond arg
 
 parseKillArg :: Parser KillArg
 parseKillArg = (KillIndirect `liftM` (char '@' >> parseExpAtom))

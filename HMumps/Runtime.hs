@@ -21,6 +21,7 @@ import Data.Char (chr)
 import Data.Map
 import Data.MValue
 import Data.MArray
+import Data.Monoid
 
 import HMumps.Routine
 import HMumps.SyntaxTree
@@ -207,6 +208,21 @@ exec (cmd:cmds) = case cmd of
                                                 Just expr -> do mv <- eval expr
                                                                 return $ Just $ Just mv
                                            else return Nothing
+
+   Xecute cond arg -> do
+     condition <- case cond of
+                    Nothing -> return True
+                    Just ex -> mToBool `liftM` eval ex
+     when condition $ do
+       String str <- mString `liftM` eval arg
+       case parse parseCommands "XECUTE" str of
+         Left _err -> fail "" -- todo, better error message
+         Right xcmds -> do
+          let newFrame = RunState (Just $ (Env NormalEnv) mempty) (const Nothing)
+          modify (newFrame:)
+          exec $ xcmds ++ [Quit Nothing Nothing]
+          modify tail
+     exec cmds
 
    c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)) >> return Nothing
 
