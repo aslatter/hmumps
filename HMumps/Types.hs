@@ -128,6 +128,7 @@ type Subscript = Expression
 data KillArg = KillSelective Vn
              | KillExclusive [Name]
              | KillIndirect  Expression
+             | KillArgList [KillArg] -- not parsed, only used internally
  deriving (Show)
 
 -- |An argument to merge specifies a source and a target.

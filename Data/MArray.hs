@@ -6,6 +6,7 @@ module Data.MArray (
                mIndex,
                mSubArray,
                arrayUpdate,
+               killSub,
                order
               ) where
 
@@ -56,6 +57,15 @@ arrayUpdate ma@(MArray n map') (sub:subs) v' =  MArray n map'' where
 
     ma' :: MArray
     ma' = arrayUpdate (nextArray sub ma) subs v'
+
+killSub :: MArray -> [MValue] -> MArray
+killSub MArray{} [] = error "fatal error in MArray.killSub"
+killSub (MArray v m) [x] = MArray v $ x `delete` m
+killSub a@(MArray v m) (x:xs)
+    = case x `lookup` m of
+        Nothing -> a
+        Just a' -> MArray v $ insert x (killSub a' xs) m
+
 
 -- Given an Array and a Subscript reurns either the next
 -- array or an 'empty' array.

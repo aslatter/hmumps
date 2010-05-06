@@ -63,7 +63,24 @@ instance Normalizable WriteArg where
             Left err -> (liftIO . putStrLn . show $ err) >> fail ""
     normalize x = return x
 
+instance Normalizable KillArg where
+    normalize (KillIndirect expr)
+        = do
+      result <- eval expr
+      let String str = mString result
+      case parse (mlist1 parseKillArg) "Indirect KILL argument" str of
+        Right args -> do
+          args' <- mapM normalize args
+          case args' of
+            [arg] -> return arg
+            _     -> return $ KillArgList args'
+        Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+    normalize x = return x
 
+-- | Remove any KillArgList constructors
+flattenKillArgs :: [KillArg] -> [KillArg]
+flattenKillArgs (KillArgList args':args) = args' ++ args
+flattenKillArgs xs = xs
 
 data RunState = RunState {env       :: Maybe Env,
                           tags      :: Routine}
@@ -75,9 +92,32 @@ data Env = Env EnvTag (Map String EnvEntry)
 
 data EnvTag = NormalEnv
             | StopEnv
+ deriving Eq
 
 data EnvEntry = LookBack (Maybe Name)
               | Entry MArray
+
+
+killLocal :: Name -> RunMonad ()
+killLocal label = modify $ go label
+
+ where go _ [] = []
+       go label (f:fs)
+           | noEnvFrame f = f : go label fs
+           | otherwise
+               = case f of
+                   RunState (Just (Env envTag envMap)) rou
+                       -> case label `lookup` envMap of
+                            Nothing
+                                | envTag == StopEnv -> f:fs
+                                | otherwise -> f : go label fs
+                            Just (Entry ary)
+                                -> (RunState (Just (Env envTag (label `delete` envMap))) rou) : fs
+                            Just (LookBack Nothing) -> f : go label fs
+                            Just (LookBack (Just newLabel)) -> f : go newLabel fs
+
+       noEnvFrame (RunState Nothing _) = True
+       noEnvFrame _ = False
 
 fetch' :: String -> [RunState] -> Maybe MArray
 fetch' str xs = join . fst $ foldl helper (Nothing,str) [x | Just x <- fmap env xs] where
@@ -130,6 +170,12 @@ setVar str ma = modify (put' str ma)
 change :: MonadState [RunState] m => String -> [MValue] -> MValue -> m ()
 change name subs val = do ma <- fetch name
                           setVar name (arrayUpdate ma subs val)
+
+kill :: Name -> [MValue] -> RunMonad ()
+kill label [] = killLocal label
+kill label subs = do
+  ma <- fetch label
+  setVar label (killSub ma subs)
 
 orM :: Monad m => [m Bool] -> m Bool
 orM [] = return False
@@ -223,6 +269,28 @@ exec (cmd:cmds) = case cmd of
           exec $ xcmds ++ [Quit Nothing Nothing]
           modify tail
      exec cmds
+
+   Kill cond args -> do
+       condition <- case cond of
+                      Nothing -> return True
+                      Just ex -> mToBool `liftM` eval ex
+       when condition $ case args of
+         [] -> fail "Sorry, I don't know how to kill everything"
+         _ -> do
+           args' <- flattenKillArgs `liftM` (mapM normalize args)
+           forM_ args' $ \arg ->
+               case arg of
+                 KillSelective vn'
+                     -> do
+                         vn <- normalize vn'
+                         case vn of
+                           Lvn name subs' -> do
+                                    subs <- mapM eval subs'
+                                    kill name subs
+                           _ -> fail "I can only kill locals, sorry"
+                 _ -> fail "I can only do selective kills, sorry!"
+       exec cmds
+
 
    c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)) >> return Nothing
 
@@ -432,7 +500,7 @@ funcall args' argnames cmds r =
                                   let entry = Entry $ arrayUpdate mEmpty [] mval
                                   return $ insert name entry m
              FunArgName name' -> return $ insert name (LookBack $ Just name') m
-             
+
 runFunctionCall :: [Line] -> RunMonad (Maybe MValue)
 runFunctionCall [] = return Nothing
 runFunctionCall (x:xs) = do result <- exec x
