@@ -40,12 +40,16 @@ interpreterCommands str next = (liftIO $ putStrLn $ "Unkown interpreter command:
 
 repl :: (MonadState [RunState] m, MonadIO m) => String -> m ()
 repl [] = return ()
-repl x = case parse parseCommands "" x of
-           Left err -> liftIO $ putStrLn $ show err
-           Right xs -> do result <- runErrorT (exec xs >> liftIO (putChar '\n') >> setX 0 >> addY 1)
-                          case result of
-                            Right _ -> return ()
-                            Left str -> liftIO $ putStrLn str
+repl x = do
+  case parse parseCommands "" x of
+    Left err -> do
+           liftIO $ putStrLn $ show err
+           modify (take 1)
+    Right xs -> do
+           result <- runErrorT (exec xs >> liftIO (putChar '\n') >> setX 0 >> addY 1)
+           case result of
+             Right _ -> return ()
+             Left str -> liftIO $ putStrLn str
 
 splash :: String
 splash = $(bakedString "SPLASH")
