@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall -fglasgow-exts #-}
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, ViewPatterns #-}
 
 module HMumps.Runtime(RunState(..),
                       Env(..),
@@ -77,10 +77,32 @@ instance Normalizable KillArg where
         Left err -> (liftIO . putStrLn . show $ err) >> fail ""
     normalize x = return x
 
+instance Normalizable NewArg where
+    normalize (NewIndirect expr)
+        = do
+      result <- eval expr
+      let String str = mString result
+      case parse (mlist1 parseNewArg) "Indirect NEW argument" str of
+        Right args -> do
+          args' <- mapM normalize args
+          case args' of
+            [arg] -> return arg
+            _ -> return $ NewArgList args'
+        Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+    normalize x = return x
+
+
 -- | Remove any KillArgList constructors
 flattenKillArgs :: [KillArg] -> [KillArg]
-flattenKillArgs (KillArgList args':args) = args' ++ args
-flattenKillArgs xs = xs
+flattenKillArgs (KillArgList args':args) = flattenKillArgs args' ++ flattenKillArgs args
+flattenKillArgs [] = []
+flattenKillArgs (x:xs) = x : flattenKillArgs xs
+
+-- | Remove any NewArgList constructors
+flattenNewArgs :: [NewArg] -> [NewArg]
+flattenNewArgs (NewArgList args':args) = flattenNewArgs args' ++ flattenNewArgs args
+flattenNewArgs [] = []
+flattenNewArgs (x:xs) = x : flattenNewArgs xs
 
 data RunState = RunState {env       :: Maybe Env,
                           tags      :: Routine}
@@ -118,6 +140,44 @@ killLocal label = modify $ go label
 
        noEnvFrame (RunState Nothing _) = True
        noEnvFrame _ = False
+
+new :: Name -> RunMonad ()
+new label
+    = modify $ \state ->
+      case state of
+        [] -> fail "NEW called with an empty stack!"
+        (x:xs) -> go x : xs
+
+ where
+   go (RunState Nothing r) = RunState (Just (Env NormalEnv (insert label (Entry mEmpty) empty))) r
+   go (RunState (Just env) r)
+       = let newEnv
+                 = case env of
+                    Env NormalEnv eMap -> Env NormalEnv $ insert label (Entry mEmpty) eMap
+                    Env StopEnv eMap -> Env StopEnv $ delete label eMap
+         in RunState (Just newEnv) r
+
+newExclusive :: [Name] -> RunMonad ()
+newExclusive labels
+    = modify $ \state ->
+      case state of
+        [] -> fail "NEW called with an empty stack!"
+        (x:xs) -> go x : xs
+
+ where
+   go (RunState oldEnv r)
+       = let newEnv = foldr addLabel (Env StopEnv mempty) labels
+         in RunState (Just newEnv) r
+    where
+      addLabel label@(inEnv oldEnv -> Just entry) e@(Env StopEnv eMap)
+          = Env StopEnv $ insert label entry eMap
+      addLabel label e@(Env StopEnv eMap)
+          = Env StopEnv $ insert label (LookBack Nothing) eMap
+
+      inEnv Nothing lbl = Nothing
+      inEnv (Just (Env _ eMap)) lbl
+          = lbl `lookup` eMap
+
 
 fetch' :: String -> [RunState] -> Maybe MArray
 fetch' str xs = join . fst $ foldl helper (Nothing,str) [x | Just x <- fmap env xs] where
@@ -271,10 +331,10 @@ exec (cmd:cmds) = case cmd of
      exec cmds
 
    Kill cond args -> do
-       condition <- case cond of
-                      Nothing -> return True
-                      Just ex -> mToBool `liftM` eval ex
-       when condition $ case args of
+     condition <- case cond of
+                    Nothing -> return True
+                    Just ex -> mToBool `liftM` eval ex
+     when condition $ case args of
          [] -> fail "Sorry, I don't know how to kill everything"
          _ -> do
            args' <- flattenKillArgs `liftM` (mapM normalize args)
@@ -289,7 +349,22 @@ exec (cmd:cmds) = case cmd of
                                     kill name subs
                            _ -> fail "I can only kill locals, sorry"
                  _ -> fail "I can only do selective kills, sorry!"
-       exec cmds
+     exec cmds
+
+   New cond args -> do
+     condition <- case cond of
+                    Nothing -> return True
+                    Just ex -> mToBool `liftM` eval ex
+     when condition $ case args of
+         [] -> newExclusive []
+         _ -> do
+           args' <- flattenNewArgs `liftM` (mapM normalize args)
+           forM_ args' $ \arg ->
+               case arg of
+                 NewSelective name -> new name
+                 NewExclusive names -> newExclusive names
+                 _ -> error "Fatal error processing arguments to NEW"
+     exec cmds
 
 
    c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)) >> return Nothing

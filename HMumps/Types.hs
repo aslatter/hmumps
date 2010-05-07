@@ -147,6 +147,7 @@ data MergeArg = MergeArg Vn Vn | MergeArgIndirect Expression
 data NewArg = NewSelective Name
             | NewExclusive [Name]
             | NewIndirect  Expression
+            | NewArgList [NewArg] -- not parsed. Internal only.
  deriving (Show)
 
 data WriteArg = WriteExpression Expression

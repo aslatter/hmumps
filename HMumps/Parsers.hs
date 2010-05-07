@@ -14,6 +14,7 @@ module HMumps.Parsers (
              parseVn,
              parseWriteArg,
              parseKillArg,
+             parseNewArg,
              mlist,
              mlist1,
              arglist,
