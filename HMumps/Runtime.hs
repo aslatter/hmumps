@@ -392,6 +392,25 @@ exec (cmd:cmds)
             _ -> return ()
           modify tail
 
+   go (Block cond _rou lines) = do
+     condition <- evalCond cond
+     when condition $ do
+       RunState _ r <- gets head
+       let newFrame = RunState Nothing r
+       modify (newFrame:)
+       doBlockLines lines
+       modify tail
+    where
+      doBlockLines [] = return ()
+      doBlockLines (cmds:rest)
+          = do
+        res <- exec cmds
+        case res of
+          Nothing -> doBlockLines rest
+          Just Nothing -> return ()
+          Just Just{} -> fail "Argumentless DO block cannot quit with a value"
+
+
    go (Kill cond args) = do
      condition <- evalCond cond
      when condition $ case args of

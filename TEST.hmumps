@@ -1,4 +1,12 @@
-TEST     Write "Hello, world!",! Quit ;comment
+TEST(val)
+ d
+ . n val
+ . s val=5
+ . d TEST(1)
+ . q
+ . w "Quit in a block is broken!",!
+ w "Passed in argument: ",val,!
+ Quit ;comment
 
  ;My first working function!
 ADD(x,y) Quit x+y
