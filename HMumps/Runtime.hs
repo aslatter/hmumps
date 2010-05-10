@@ -304,7 +304,9 @@ orM (x:xs) = do x' <- x
 -- A return value of 'Just (Just mv)' means that we should quit with a return value of mv.
 exec :: Line -> RunMonad (Maybe (Maybe MValue))
 exec []  = return Nothing
-exec (Nop:cmds) = exec cmds
+
+-- special commamds which (may) use the rest of the command list, or may
+-- return without processing the entire list
 exec (ForInf:cmds) = forInf (cycle cmds)
 exec ((For vn farg):cmds) = case farg of
                               ForArg1 expr -> exec $ (Set Nothing [([vn],expr)]) : ForInf : cmds
@@ -340,37 +342,47 @@ exec ((If xs):cmds) = do let xs' =  fmap eval xs
                          if cond
                           then setTest True  >> exec cmds
                           else setTest False >> return Nothing
+exec ((Halt cond):cmds)
+    = case cond of
+        Nothing -> liftIO (exitWith ExitSuccess) >> return Nothing
+        Just expr -> do mv <- eval expr
+                        if mToBool mv
+                         then liftIO (exitWith ExitSuccess) >> return Nothing
+                         else exec cmds
+exec ((Quit cond arg):cmds)
+    = do
+  case cond of
+    Nothing   -> case arg of
+                   Nothing   -> return $ Just Nothing
+                   Just expr -> do mv <- eval expr
+                                   return $ Just $ Just mv
+    Just cond' -> do cond'' <- eval cond'
+                     if mToBool cond''
+                      then case arg of
+                          Nothing   -> return $ Just Nothing
+                          Just expr -> do mv <- eval expr
+                                          return $ Just $ Just mv
+                      else exec cmds
+
+-- regular commands go through the command driver
 exec ((Write cond ws):cmds) = case cond of
                                 Nothing   -> write ws >> exec cmds
                                 Just expr -> do mcond <- eval expr
                                                 (if mToBool mcond then write ws else return ()) >> exec cmds
-exec (cmd:cmds) = case cmd of
-   Set cond sas -> case cond of
-     Nothing   -> set sas >> exec cmds
-     Just expr -> do mTest <- eval expr
-                     if mToBool mTest
-                      then set sas >> exec cmds
-                      else exec cmds
-   Halt cond -> case cond of
-                  Nothing -> liftIO (exitWith ExitSuccess) >> return Nothing
-                  Just expr -> do mv <- eval expr
-                                  if mToBool mv
-                                   then liftIO (exitWith ExitSuccess) >> return Nothing
-                                   else exec cmds
-   Quit cond arg -> do case cond of
-                         Nothing   -> case arg of
-                                        Nothing   -> return $ Just Nothing
-                                        Just expr -> do mv <- eval expr
-                                                        return $ Just $ Just mv
-                         Just cond' -> do cond'' <- eval cond'
-                                          if mToBool cond''
-                                           then case arg of
-                                                Nothing   -> return $ Just Nothing
-                                                Just expr -> do mv <- eval expr
-                                                                return $ Just $ Just mv
-                                           else return Nothing
+exec (cmd:cmds)
+    = do
+  go cmd
+  exec cmds
 
-   Xecute cond arg -> do
+ where
+   go Nop = return ()
+
+   go (Set cond sas) = case cond of
+     Nothing   -> set sas
+     Just expr -> do mTest <- eval expr
+                     when (mToBool mTest) $ set sas
+
+   go (Xecute cond arg) = do
      condition <- case cond of
                     Nothing -> return True
                     Just ex -> mToBool `liftM` eval ex
@@ -384,9 +396,8 @@ exec (cmd:cmds) = case cmd of
           res <- exec $ xcmds ++ [Quit Nothing Nothing]
           when (isJust res) $ fail "XECUTE returned with a value"
           modify tail
-     exec cmds
 
-   Kill cond args -> do
+   go (Kill cond args) = do
      condition <- case cond of
                     Nothing -> return True
                     Just ex -> mToBool `liftM` eval ex
@@ -405,9 +416,8 @@ exec (cmd:cmds) = case cmd of
                                     kill name subs
                            _ -> fail "I can only kill locals, sorry"
                  _ -> fail "I can only do selective kills, sorry!"
-     exec cmds
 
-   New cond args -> do
+   go (New cond args) = do
      condition <- case cond of
                     Nothing -> return True
                     Just ex -> mToBool `liftM` eval ex
@@ -420,22 +430,16 @@ exec (cmd:cmds) = case cmd of
                  NewSelective name -> new name
                  NewExclusive names -> newExclusive names
                  _ -> error "Fatal error processing arguments to NEW"
-     exec cmds
 
-   Do cond args -> do
-        condition <- evalCond cond
-        when condition $
-             forM_ args $
-                   \arg'
-                       -> do
-                     arg <- normalize arg'
-                     case arg of
-                       DoArgList argList -> mapM_ processDo argList
-                       _ -> processDo arg
-        exec cmds
+   go (Do cond args) = do
+      condition <- evalCond cond
+      when condition $ forM_ args $ \arg' -> do
+          arg <- normalize arg'
+          case arg of
+            DoArgList argList -> mapM_ processDo argList
+            _ -> processDo arg
 
-
-   c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)) >> return Nothing
+   go c =  fail $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)
 
 processDo :: DoArg -> RunMonad ()
 processDo (DoArg cond entryRef args)
