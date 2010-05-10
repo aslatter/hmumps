@@ -37,8 +37,6 @@ import Control.Monad.Error
 import System(exitWith)
 import System.Exit(ExitCode(..))
 
-type RunStateMonad a = MonadState [RunState] m => m a
-
 newtype RunMonad a = RM {runRunMonad :: ErrorT String (StateT [RunState] IO) a}
     deriving (Functor, Monad, MonadIO, MonadState [RunState], MonadError String)
 
@@ -162,7 +160,10 @@ data RunState = RunState {env       :: Maybe Env,
                           tags      :: Routine}
 
 emptyState :: [RunState]
-emptyState = [RunState Nothing (\_ -> Nothing)]
+emptyState = [emptyFrame]
+
+emptyFrame :: RunState
+emptyFrame = RunState Nothing (\_ -> Nothing)
 
 data Env = Env EnvTag (Map String EnvEntry)
 
@@ -255,7 +256,7 @@ fetch' str xs = join . fst $ foldl helper (Nothing,str) [x | Just x <- fmap env 
                                                              Nothing      -> (Nothing, name)
 
 -- |Returns the MArray associated with the named local var, or the empty MArray
-fetch :: String -> RunStateMonad MArray
+fetch :: String -> RunMonad MArray
 fetch str = do result <- (fetch' str) `liftM` get
                case result of
                   Just x  -> return x
@@ -279,10 +280,10 @@ put' str ma (x:xs) = case (env x) of
                                             Just (LookBack Nothing)     -> x : (put' str  ma xs)
                                             Just (LookBack (Just str')) -> x : (put' str' ma xs)
 
-setVar :: MonadState [RunState] m => String -> MArray -> m ()
+setVar :: String -> MArray -> RunMonad ()
 setVar str ma = modify (put' str ma)
 
-change :: MonadState [RunState] m => String -> [MValue] -> MValue -> m ()
+change :: String -> [MValue] -> MValue -> RunMonad ()
 change name subs val = do ma <- fetch name
                           setVar name (arrayUpdate ma subs val)
 
@@ -384,20 +385,20 @@ exec (cmd:cmds)
        case parse parseCommands "XECUTE" str of
          Left _err -> fail "" -- todo, better error message
          Right xcmds -> do
-          let newFrame = RunState (Just $ (Env NormalEnv) mempty) (const Nothing)
-          modify (newFrame:)
+          modify (emptyFrame:)
           res <- exec $ xcmds ++ [Quit Nothing Nothing]
           case res of
             Just (Just{}) -> fail "XECUTE cannot return with a value"
             _ -> return ()
           modify tail
 
+   -- the "routine" argument is only for use with GOTO,
+   -- so we ignore it for now
    go (Block cond _rou lines) = do
      condition <- evalCond cond
      when condition $ do
        RunState _ r <- gets head
-       let newFrame = RunState Nothing r
-       modify (newFrame:)
+       modify (emptyFrame {tags = r}:)
        doBlockLines lines
        modify tail
     where
