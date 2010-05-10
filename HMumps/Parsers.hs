@@ -18,6 +18,7 @@ module HMumps.Parsers (
              parseDoArg,
              parseRoutineRef,
              parseLabel,
+             parseGotoArg,
              mlist,
              mlist1,
              arglist,

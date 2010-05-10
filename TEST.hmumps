@@ -1,11 +1,12 @@
 TEST(val)
- d
+ d:'val
  . n val
  . s val=5
  . d TEST(1)
  . q
  . w "Quit in a block is broken!",!
  w "Passed in argument: ",val,!
+ g testGoto
  Quit ;comment
 
  ;My first working function!
@@ -23,3 +24,11 @@ FACT(x)  Quit:(x<2) 1
 ; test for killing in a stack frame
 testKill(var) k var q 1
 
+testGoto
+ w "In goto!",!
+ d
+ . g innerLabel
+ . q
+innerLabel . w "Really in a goto!",!
+ . q
+ q

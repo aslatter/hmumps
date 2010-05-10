@@ -11,7 +11,6 @@ module HMumps.Runtime(RunState(..),
                       Normalizable(..),
                       setX, setY,
                       addX, addY,
-                      runFunctionCall,
                       RunMonad,
                       step
                      )
@@ -136,6 +135,15 @@ instance Normalizable Label where
         Left err -> normalizeError err
     normalize x = return x
 
+instance Normalizable GotoArg where
+    normalize (GotoArgIndirect expr)
+        = do
+      str <- asString <$> eval expr
+      case parse parseGotoArg "GOTO argument" str of
+        Right arg -> return arg
+        Left err -> normalizeError err
+    normalize x = return x
+
 normalizeError :: (Show a, MonadIO m) => a -> m b
 normalizeError err = (liftIO . putStrLn . show $ err) >> fail ""
 
@@ -156,14 +164,16 @@ flattenNewArgs (NewArgList args':args) = flattenNewArgs args' ++ flattenNewArgs 
 flattenNewArgs [] = []
 flattenNewArgs (x:xs) = x : flattenNewArgs xs
 
-data RunState = RunState {env       :: Maybe Env,
-                          tags      :: Routine}
+data RunState = RunState { env       :: Maybe Env
+                         , tags      :: Routine
+                         , gotoTags  :: Routine
+                         }
 
 emptyState :: [RunState]
 emptyState = [emptyFrame]
 
 emptyFrame :: RunState
-emptyFrame = RunState Nothing (\_ -> Nothing)
+emptyFrame = RunState Nothing (\_ -> Nothing) (\_ -> Nothing)
 
 data Env = Env EnvTag (Map String EnvEntry)
 
@@ -183,18 +193,18 @@ killLocal = modify . go
            | noEnvFrame f = f : go label fs
            | otherwise
                = case f of
-                   RunState (Just (Env envTag envMap)) rou
+                   RunState (Just (Env envTag envMap)) rou gRou
                        -> case label `lookup` envMap of
                             Nothing
                                 | envTag == StopEnv -> f:fs
                                 | otherwise -> f : go label fs
                             Just (Entry _ary)
-                                -> (RunState (Just (Env envTag (label `delete` envMap))) rou) : fs
+                                -> (RunState (Just (Env envTag (label `delete` envMap))) rou gRou) : fs
                             Just (LookBack Nothing) -> f : go label fs
                             Just (LookBack (Just newLabel)) -> f : go newLabel fs
                    _ -> error "Fatal error in KILL"
 
-       noEnvFrame (RunState Nothing _) = True
+       noEnvFrame (RunState Nothing _ _) = True
        noEnvFrame _ = False
 
 new :: Name -> RunMonad ()
@@ -205,13 +215,13 @@ new label
         (x:xs) -> go x : xs
 
  where
-   go (RunState Nothing r) = RunState (Just (Env NormalEnv (insert label (Entry mEmpty) empty))) r
-   go (RunState (Just ev) r)
+   go (RunState Nothing r gr) = RunState (Just (Env NormalEnv (insert label (Entry mEmpty) empty))) r gr
+   go (RunState (Just ev) r gr)
        = let newEnv
                  = case ev of
                     Env NormalEnv eMap -> Env NormalEnv $ insert label (Entry mEmpty) eMap
                     Env StopEnv eMap -> Env StopEnv $ delete label eMap
-         in RunState (Just newEnv) r
+         in RunState (Just newEnv) r gr
 
 newExclusive :: [Name] -> RunMonad ()
 newExclusive labels
@@ -221,9 +231,9 @@ newExclusive labels
         (x:xs) -> go x : xs
 
  where
-   go (RunState oldEnv r)
+   go (RunState oldEnv r gr)
        = let newEnv = foldr addLabel (Env StopEnv mempty) labels
-         in RunState (Just newEnv) r
+         in RunState (Just newEnv) r gr
     where
       addLabel label@(inEnv oldEnv -> Just entry) (Env _StopEnv eMap)
           = Env StopEnv $ insert label entry eMap
@@ -360,6 +370,48 @@ exec ((Quit cond arg):cmds)
                      return $ Just $ Just mv
      else exec cmds
 
+exec ((Goto cond args):cmds)
+    = do
+  condition <- evalCond cond
+  if condition
+   then execGotoArgs args
+   else exec cmds
+
+ where
+   execGotoArgs [] = exec cmds
+   execGotoArgs (arg':args)
+       = do
+     GotoArg cond entryRef <- normalize arg'
+     condition <- evalCond cond
+     if condition
+      then do
+         (rou,tag) <- unpackEntryRef entryRef
+         liftM Just $ goto rou tag
+      else execGotoArgs args
+
+   unpackEntryRef :: EntryRef -> RunMonad (Maybe Name, Name)
+   unpackEntryRef entryRef =
+       case entryRef of
+         Routine rRef -> do
+                       Routineref name <- normalize rRef
+                       return (Just name, "")
+         Subroutine label' Nothing Nothing -> do
+                       label <- labelName label'
+                       return (Nothing, label)
+         Subroutine label' Nothing (Just rRef) -> do
+                       label <- labelName label'
+                       Routineref name <- normalize rRef
+                       return (Just name, label)
+
+   labelName :: Label -> RunMonad Name
+   labelName label' = do
+     label <- normalize label'
+     case label of
+       Label name -> return name
+       LabelInt{} -> fail "Unable to handle numeric labels"
+       _ -> error "Fatal error handling entry reference"
+
+
 -- regular commands go through the command driver
 
 exec (cmd:cmds)
@@ -394,11 +446,11 @@ exec (cmd:cmds)
 
    -- the "routine" argument is only for use with GOTO,
    -- so we ignore it for now
-   go (Block cond _rou lines) = do
+   go (Block cond rou lines) = do
      condition <- evalCond cond
      when condition $ do
-       RunState _ r <- gets head
-       modify (emptyFrame {tags = r}:)
+       RunState _ r _ <- gets head
+       modify (emptyFrame {tags = r,gotoTags=rou}:)
        doBlockLines lines
        modify tail
     where
@@ -642,14 +694,38 @@ localCall label args = do (r :: Routine) <- (tags . head) `liftM` get
 
 
 remoteCall :: Name -> Name -> [FunArg] -> RunMonad (Maybe MValue)
-remoteCall label routine args = let filename = routine ++ ".hmumps" in
-  do text <- liftIO $ readFile filename
-     case parse parseFile filename text of
-       Left a ->  (fail . show) a
-       Right f -> let r = pack $ transform f in
-                  case r label of
-                    Nothing -> fail $ "Noline: " ++ label ++ "^"  ++ routine
-                    Just (argnames, cmds) -> funcall args argnames cmds r
+remoteCall label routine args
+    = openRemote routine $ \r ->
+      case r label of
+        Nothing -> fail $ "Noline: " ++ label ++ "^"  ++ routine
+        Just (argnames, cmds) -> funcall args argnames cmds r
+
+goto :: Maybe Name -> Name -> RunMonad (Maybe MValue)
+goto Nothing tag
+    = do
+  s <- gets head
+  doGoto tag (tags s) (gotoTags s)
+goto (Just rouName) tag
+    = openRemote rouName $ \r -> doGoto tag r r
+
+doGoto :: Name -> Routine -> Routine -> RunMonad (Maybe MValue)
+doGoto tag r gr
+    = case gr tag of
+        Nothing -> fail $ "Noline: " ++ tag
+        Just ([], cmds) -> do
+                   modify $ \(s:ss) -> s {tags=r,gotoTags=gr} : ss
+                   runLines cmds
+        Just{} -> fail "Error in GOTO: tag should not take arguments"
+
+openRemote :: MonadIO m => Name -> (Routine -> m a) -> m a 
+openRemote routine k
+    = do
+  let filename = routine ++ ".hmumps"
+  text <- liftIO $ readFile filename
+  case parse parseFile filename text of
+    Left a -> (fail . show) a
+    Right f -> let r = pack $ transform f in
+               k r
 
 evalBif :: BifCall -> RunMonad MValue
 evalBif (BifChar args') = do
@@ -701,9 +777,9 @@ funcall args' argnames cmds r =
     case remainder of
       Just (Left _) -> fail "Supplied too many parameters to function"
       _ -> do m <- foldM helper empty pairs
-              let newframe = RunState (Just $ Env NormalEnv m) r
+              let newframe = RunState (Just $ Env NormalEnv m) r r
               modify (newframe:)
-              x <- runFunctionCall cmds
+              x <- runLines cmds
               modify tail
               return x
 
@@ -714,12 +790,12 @@ funcall args' argnames cmds r =
                                   return $ insert name entry m
              FunArgName name' -> return $ insert name (LookBack $ Just name') m
 
-runFunctionCall :: [Line] -> RunMonad (Maybe MValue)
-runFunctionCall [] = return Nothing
-runFunctionCall (x:xs) = do result <- exec x
-                            case result of
-                              Nothing -> runFunctionCall xs
-                              Just x' -> return x'
+runLines :: [Line] -> RunMonad (Maybe MValue)
+runLines [] = return Nothing
+runLines (x:xs) = do result <- exec x
+                     case result of
+                       Nothing -> runLines xs
+                       Just x' -> return x'
 
 zipRem :: [a] -> [b] -> ([(a,b)],Maybe (Either [a] [b]))
 zipRem [] []         = ([],Nothing)
