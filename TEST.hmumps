@@ -14,3 +14,4 @@ FACT(x)  Quit:(x<2) 1
 
 ; test for killing in a stack frame
 testKill(var) k var q 1
+

@@ -15,6 +15,9 @@ module HMumps.Parsers (
              parseWriteArg,
              parseKillArg,
              parseNewArg,
+             parseDoArg,
+             parseRoutineRef,
+             parseLabel,
              mlist,
              mlist1,
              arglist,
@@ -450,13 +453,16 @@ parseEntryRef = (Routine `liftM` parseRoutineRef)
                     routine <- parseRoutine
                     return $ Subroutine lbl offset routine)
  where
-   parseLabel = (char '@' >> LabelIndirect `liftM` parseExpAtom)
-            <|> (Label `liftM` litName)
    parseOffset = (char '+' >> (Just . read) `liftM` many1 (oneOf "1234567890"))
              <|> (return Nothing)
    parseRoutine = (Just `liftM` parseRoutineRef)
               <|> (return Nothing)
                       
+
+parseLabel :: Parser Label
+parseLabel = (char '@' >> LabelIndirect `liftM` parseExpAtom)
+         <|> (Label `liftM` litName)
+
                    
 -- Differs from parseExp because a funarg may be either:
 --  1) An Expression

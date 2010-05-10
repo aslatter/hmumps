@@ -10,7 +10,8 @@ module HMumps.Runtime(RunState(..),
                       setX, setY,
                       addX, addY,
                       runFunctionCall,
-                      -- RunMonad, RunStateMonad,
+                      RunMonad,
+                      step
                      )
 where
 
@@ -27,14 +28,26 @@ import HMumps.Routine
 import HMumps.SyntaxTree
 import HMumps.Parsers
 
+import Control.Applicative hiding (empty)
 import Control.Monad.State
+import Control.Monad.Error
 import Control.Monad.Maybe
 
 import System(exitWith)
 import System.Exit(ExitCode(..))
 
 type RunStateMonad a = MonadState [RunState] m => m a
-type RunMonad a      = (MonadIO m, MonadState [RunState] m) => m a
+
+newtype RunMonad a = RM {runRunMonad :: ErrorT String (StateT [RunState] IO) a}
+    deriving (Functor, Monad, MonadIO, MonadState [RunState], MonadError String)
+
+step :: (MonadState [RunState] m, MonadIO m) => RunMonad a -> m (Either String a)
+step k
+    = do
+  (s :: [RunState]) <- get
+  (a, s) <- liftIO $ flip runStateT s $ runErrorT $ runRunMonad k
+  put s
+  return a
 
 -- |Anything you may ever want to strip indirection off of should
 --  be an instance of this class
@@ -44,53 +57,92 @@ class Normalizable a where
 instance Normalizable Vn where
     normalize (IndirectVn expr subs)
      = do result <- eval expr
-          let String str = mString result
+          let str = asString result
           case parse parseVn "Indirect VN" str of
             Right (IndirectVn expr' subs') -> normalize $ IndirectVn expr' (subs' ++ subs)
             Right (Lvn label subs') -> return $ Lvn label (subs' ++ subs)
             Right (Gvn label subs') -> return $ Gvn label (subs' ++ subs)
-            Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+            Left err -> normalizeError err
     normalize x = return x
 
 instance Normalizable WriteArg where
     normalize (WriteIndirect expr)
      = do result <- eval expr
-          let String str = mString result
+          let str = asString result
           case parse parseWriteArg "Indirect Write Argument" str of
             Right wa -> case wa of
                           w@(WriteIndirect _) -> normalize w
                           w -> return w
-            Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+            Left err -> normalizeError err
     normalize x = return x
 
 instance Normalizable KillArg where
     normalize (KillIndirect expr)
         = do
       result <- eval expr
-      let String str = mString result
+      let str = asString result
       case parse (mlist1 parseKillArg) "Indirect KILL argument" str of
         Right args -> do
           args' <- mapM normalize args
           case args' of
             [arg] -> return arg
             _     -> return $ KillArgList args'
-        Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+        Left err -> normalizeError err
     normalize x = return x
 
 instance Normalizable NewArg where
     normalize (NewIndirect expr)
         = do
       result <- eval expr
-      let String str = mString result
+      let str = asString result
       case parse (mlist1 parseNewArg) "Indirect NEW argument" str of
         Right args -> do
           args' <- mapM normalize args
           case args' of
             [arg] -> return arg
             _ -> return $ NewArgList args'
-        Left err -> (liftIO . putStrLn . show $ err) >> fail ""
+        Left err -> normalizeError err
     normalize x = return x
 
+instance Normalizable DoArg where
+    normalize (DoArgIndirect expr)
+        = do
+      result <- eval expr
+      let str = asString result
+      case parse (mlist1 parseDoArg) "Indirect DO argument" str of
+        Right args -> do
+          args' <- mapM normalize args
+          case args' of
+            [arg] -> return arg
+            _ -> return $ DoArgList args'
+        Left err -> normalizeError err
+    normalize x = return x
+
+instance Normalizable Routineref where
+    normalize (RoutinerefIndirect expr)
+        = do
+      result <- eval expr
+      let str = asString result
+      case parse parseRoutineRef "Indirect routine ref" str of
+        Right ref -> normalize ref
+        Left err -> normalizeError err
+    normalize x = return x
+
+instance Normalizable Label where
+    normalize (LabelIndirect expr)
+        = do
+      str <- asString <$> eval expr
+      case parse parseLabel "Indirect label" str of
+        Right lbl -> normalize lbl
+        Left err -> normalizeError err
+    normalize x = return x
+
+normalizeError err = (liftIO . putStrLn . show $ err) >> fail ""
+
+asString :: MValue -> String
+asString v
+    = let String str = mString v
+      in str
 
 -- | Remove any KillArgList constructors
 flattenKillArgs :: [KillArg] -> [KillArg]
@@ -247,7 +299,7 @@ orM (x:xs) = do x' <- x
 -- |A return value of 'Nothing' indicates we did not quit, and should not unroll the stack.
 -- A return value of 'Just Nothing' means we should quit with no return value.
 -- A return value of 'Just (Just mv)' means that we should quit with a return value of mv.
-exec :: (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
+exec :: Line -> RunMonad (Maybe (Maybe MValue))
 exec []  = return Nothing
 exec (Nop:cmds) = exec cmds
 exec (ForInf:cmds) = forInf (cycle cmds)
@@ -320,7 +372,7 @@ exec (cmd:cmds) = case cmd of
                     Nothing -> return True
                     Just ex -> mToBool `liftM` eval ex
      when condition $ do
-       String str <- mString `liftM` eval arg
+       str <- asString `liftM` eval arg
        case parse parseCommands "XECUTE" str of
          Left _err -> fail "" -- todo, better error message
          Right xcmds -> do
@@ -366,10 +418,53 @@ exec (cmd:cmds) = case cmd of
                  _ -> error "Fatal error processing arguments to NEW"
      exec cmds
 
+   Do cond args -> do
+        condition <- evalCond cond
+        when condition $
+             forM_ args $
+                   \arg'
+                       -> do
+                     arg <- normalize arg'
+                     case arg of
+                       DoArgList args -> mapM_ processDo args
+                       _ -> processDo arg
+        exec cmds
+
 
    c -> (liftIO $ putStrLn $ "Sorry, I don't know how to execute: " ++ (takeWhile (\x -> not (x==' ')) $ show c)) >> return Nothing
 
-set :: (MonadState [RunState] m, MonadIO m) => [SetArg] -> m ()
+processDo :: DoArg -> RunMonad ()
+processDo (DoArg cond entryRef args)
+    = do
+  condition <- evalCond cond
+  when condition $ do
+    case entryRef of
+      Routine routineRef'
+          -> do
+        Routineref rou <- normalize routineRef'
+        sub (Just rou) "" args
+      Subroutine label' Nothing Nothing
+          -> do
+        label <- normalize label'
+        case label of
+          Label name -> sub Nothing name args
+          LabelInt{} -> fail "Cannot use numeric labels"
+          _ -> error "fatal error in DO"
+      Subroutine label' Nothing (Just rouRef')
+          -> do
+        Routineref rou <- normalize rouRef'
+        label <- normalize label'
+        case label of
+          Label name -> sub (Just rou) name args
+          LabelInt{} -> fail "Cannot use numeric labels"
+          _ -> error "fatal error in DO"
+      Subroutine _ Just{} _ -> fail "Unable to execute DO with a numeric offset"
+
+evalCond :: Maybe Expression -> RunMonad Bool
+evalCond Nothing = return True
+evalCond (Just e) = mToBool `liftM` eval e
+
+set :: [SetArg] -> RunMonad ()
 set [] = return ()
 set ((vns,expr):ss) = do vns' <- mapM normalize vns
                          mv <- eval expr
@@ -379,19 +474,19 @@ set ((vns,expr):ss) = do vns' <- mapM normalize vns
        setHelper _ (Gvn _ _)        = fail "We don't supposrt global variables yet.  sorry."
        setHelper _ (IndirectVn _ _) = fail "Variable name should be normalized"
 
-write :: (MonadIO m, MonadState [RunState] m) => [WriteArg] -> m ()
+write :: [WriteArg] -> RunMonad ()
 write = mapM_ f
  where f wa = do
          wa' <- normalize wa
          case wa' of
            WriteExpression expr -> do m <- eval expr
-                                      let String s = mString m
+                                      let s = asString m
                                       liftIO $ putStr s
                                       addX $ fromIntegral $ length s
            WriteFormat fs -> writeFormat fs
            WriteIndirect _ -> fail "write argument should be normalized"
 
-writeFormat :: (MonadIO m, MonadState [RunState] m)=> [WriteFormatCode] -> m ()
+writeFormat :: [WriteFormatCode] -> RunMonad ()
 writeFormat = mapM_ f
  where
   f Formfeed = liftIO (putChar '\f') >> setY 1
@@ -403,38 +498,38 @@ writeFormat = mapM_ f
                    else do liftIO (putStr $ (replicate . floor) (n'-x) ' ')
                            setX n'
 
-setX :: MonadState [RunState] m => MValue -> m ()
+setX :: MValue -> RunMonad ()
 setX = change "$x" []
 
-setY :: MonadState [RunState] m => MValue -> m ()
+setY :: MValue -> RunMonad ()
 setY = change "$y" []
 
-getX :: MonadState [RunState] m => m MValue
+getX :: RunMonad MValue
 getX = getLocal "$x" []
 
-getY :: MonadState [RunState] m => m MValue
+getY :: RunMonad MValue
 getY = getLocal "y" []
 
-addX :: MonadState [RunState] m => Int -> m ()
+addX :: Int -> RunMonad ()
 addX n = do x <- getX
             setX (x + fromIntegral n)
 
-addY :: MonadState [RunState] m => Int -> m ()
+addY :: Int -> RunMonad ()
 addY n = do y <- getY
             setY (y + fromIntegral n)
 
-getLocal :: MonadState [RunState] m => String -> [MValue] -> m MValue
+getLocal :: String -> [MValue] -> RunMonad MValue
 getLocal label subs = do ma <- fetch label
                          return $ case mIndex ma subs of
                            Just mv -> mv
                            Nothing -> String ""                         
 
-getLocalArray :: MonadState [RunState] m => String -> [MValue] -> m (Maybe MArray)
+getLocalArray :: String -> [MValue] -> RunMonad (Maybe MArray)
 getLocalArray label subs = do
   ma <- fetch label
   return $ mSubArray ma subs
 
-forInf ::  (MonadState [RunState] m, MonadIO m) => Line -> m (Maybe (Maybe MValue))
+forInf ::  Line -> RunMonad (Maybe (Maybe MValue))
 forInf ((Quit cond Nothing):xs) = case cond of
     Nothing  -> return Nothing
     Just expr -> do mv <- eval expr
@@ -445,17 +540,17 @@ forInf ((Quit _ _):_) = fail "QUIT with argument in a for loop"
 forInf (cmd:xs) = exec [cmd] >> forInf xs
 forInf [] = forInf []  -- dumb
 
-break ::  (MonadState [RunState] m, MonadIO m) => m ()
+break ::  RunMonad ()
 break = fail "BREAK not working"
 
-getTest :: MonadState [RunState] m => m Bool
+getTest :: RunMonad Bool
 getTest = mToBool `liftM` getLocal "$test" []
 
-setTest :: MonadState [RunState] m => Bool -> m ()
+setTest :: Bool -> RunMonad ()
 setTest =  change "$test" [] . boolToM
 
 
-eval :: (MonadState [RunState] m, MonadIO m) => Expression -> m MValue
+eval :: Expression -> RunMonad MValue
 eval (ExpLit m) = return m
 eval (ExpVn vn) = do vn' <- normalize vn
                      case vn' of
@@ -490,20 +585,43 @@ eval (ExpBinop binop lexp rexp)
         Contains    -> lv `contains` rv
         SortsAfter  -> boolToM $ lv > rv
 -- eval (Pattern _ _)   = fail "Can't evaluate pattern matches"
-eval (FunCall label routine args) = case routine of
-                                      [] -> localCall label args
-                                      _  -> remoteCall label routine args
+eval (FunCall label "" args) = function Nothing label args 
+eval (FunCall label rou args) = function (Just rou) label args
 eval (ExpBifCall bif)   = evalBif bif
+
+function :: Maybe Name -> Name -> [FunArg] -> RunMonad MValue
+function routine tag args
+    = do
+  retVal <- call routine tag args
+  case retVal of
+    Nothing -> fail "Function quit without returning a value"
+    Just v -> return v
+
+
+sub :: Maybe Name -> Name -> [FunArg] -> RunMonad ()
+sub routine tag args
+    = do
+  retVal <- call routine tag args
+  case retVal of
+    Nothing -> return ()
+    Just{} -> fail "Subroutine quit with a value!"
+
+
+call :: Maybe Name -> Name -> [FunArg] -> RunMonad (Maybe MValue)
+call Nothing tag args = localCall tag args
+call (Just routine) "" args = call (Just routine) routine args
+call (Just routine) tag args = remoteCall tag routine args
+
+
  
-localCall :: Name -> [FunArg] -> RunMonad MValue
+localCall :: Name -> [FunArg] -> RunMonad (Maybe MValue)
 localCall label args = do (r :: Routine) <- (tags . head) `liftM` get
                           case r label of
                             Nothing -> fail $ "Noline: " ++ label
                             Just (argnames, cmds) -> funcall args argnames cmds r
 
 
-remoteCall :: (MonadIO m, MonadState [RunState] m) =>
-                Name -> Name -> [FunArg] -> m MValue
+remoteCall :: Name -> Name -> [FunArg] -> RunMonad (Maybe MValue)
 remoteCall label routine args = let filename = routine ++ ".hmumps" in
   do text <- liftIO $ readFile filename
      case parse parseFile filename text of
@@ -556,7 +674,7 @@ unSnoc (x:xs) = Just $ case unSnoc xs of
                          Nothing -> ([],x)
                          Just ~(ys,y) -> (x:ys,y)
 
-funcall :: [FunArg] -> [Name] -> [Line] -> Routine -> RunMonad MValue
+funcall :: [FunArg] -> [Name] -> [Line] -> Routine -> RunMonad (Maybe MValue)
 funcall args' argnames cmds r = 
     let (pairs, remainder) = zipRem args' argnames in
     case remainder of
@@ -565,9 +683,8 @@ funcall args' argnames cmds r =
               let newframe = RunState (Just $ Env NormalEnv m) r
               modify (newframe:)
               x <- runFunctionCall cmds
-              case x of
-                Just mv -> modify tail >> return mv
-                Nothing -> fail "Function quit without returning a value"
+              modify tail
+              return x
 
  where helper :: Map Name EnvEntry -> (FunArg, Name) -> RunMonad (Map Name EnvEntry)
        helper m (arg,name) = case arg of

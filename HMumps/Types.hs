@@ -84,6 +84,7 @@ data Command = Break (Maybe Condition)
 
 data DoArg = DoArg (Maybe Condition) EntryRef [FunArg]
            | DoArgIndirect Expression
+           | DoArgList [DoArg] -- not parsed, only used during run-time
  deriving (Show)
 
 data ForArg = ForArg1 Expression
@@ -137,10 +138,6 @@ data MergeArg = MergeArg Vn Vn | MergeArgIndirect Expression
  deriving (Show)
 
 
--- New should probably be broken up into more primative commands
--- such as PushNewframe and AddNewframeEntry or something,
--- for optimization.  I'll new to have designed the run-time
--- environment first.
 -- | The arguments to NEW are pretty much the same as the arguments
 -- to KILL.
 -- See 8.2.14
@@ -177,8 +174,6 @@ data FunArg = FunArgExp Expression
 type Name = String
 
 
--- there's somehting I'm not groking wrt the standard and expressions.
--- The "Expression" type will ikely be the last thing I define.
 -- | An expression is something which evaluates to an MValue.
 data Expression
     -- |An expression may be a literal MValue

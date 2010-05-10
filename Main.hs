@@ -46,7 +46,7 @@ repl x = do
            liftIO $ putStrLn $ show err
            modify (take 1)
     Right xs -> do
-           result <- runErrorT (exec xs >> liftIO (putChar '\n') >> setX 0 >> addY 1)
+           result <- step (exec xs >> liftIO (putChar '\n') >> setX 0 >> addY 1)
            case result of
              Right _ -> return ()
              Left str -> liftIO $ putStrLn str
