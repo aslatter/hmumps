@@ -327,12 +327,11 @@ exec ((For vn farg):cmds) = case farg of
 
                                     Set Nothing [([vn],ExpBinop Add (ExpVn vn) (ExpLit mInc))]]
 
-exec ((Break cond):cmds) = case cond of
-    Nothing -> break >> exec cmds
-    Just expr -> do mv <- eval expr
-                    if mToBool mv
-                     then break >> exec cmds
-                     else exec cmds
+exec ((Break cond):cmds) = do
+  condition <- evalCond cond
+  when condition $ break
+  exec cmds
+
 exec (Else:cmds) = do t <- getTest
                       if not t
                        then exec cmds
@@ -343,32 +342,25 @@ exec ((If xs):cmds) = do let xs' =  fmap eval xs
                           then setTest True  >> exec cmds
                           else setTest False >> return Nothing
 exec ((Halt cond):cmds)
-    = case cond of
-        Nothing -> liftIO (exitWith ExitSuccess) >> return Nothing
-        Just expr -> do mv <- eval expr
-                        if mToBool mv
-                         then liftIO (exitWith ExitSuccess) >> return Nothing
-                         else exec cmds
+    = do
+  condition <- evalCond cond
+  if condition
+     then liftIO (exitWith ExitSuccess) >> return Nothing
+     else exec cmds
+
 exec ((Quit cond arg):cmds)
     = do
-  case cond of
-    Nothing   -> case arg of
-                   Nothing   -> return $ Just Nothing
-                   Just expr -> do mv <- eval expr
-                                   return $ Just $ Just mv
-    Just cond' -> do cond'' <- eval cond'
-                     if mToBool cond''
-                      then case arg of
-                          Nothing   -> return $ Just Nothing
-                          Just expr -> do mv <- eval expr
-                                          return $ Just $ Just mv
-                      else exec cmds
+  condition <- evalCond cond
+  if condition
+     then case arg of
+            Nothing -> return $ Just Nothing
+            Just expr -> do
+                     mv <- eval expr
+                     return $ Just $ Just mv
+     else exec cmds
 
 -- regular commands go through the command driver
-exec ((Write cond ws):cmds) = case cond of
-                                Nothing   -> write ws >> exec cmds
-                                Just expr -> do mcond <- eval expr
-                                                (if mToBool mcond then write ws else return ()) >> exec cmds
+
 exec (cmd:cmds)
     = do
   go cmd
@@ -377,15 +369,16 @@ exec (cmd:cmds)
  where
    go Nop = return ()
 
-   go (Set cond sas) = case cond of
-     Nothing   -> set sas
-     Just expr -> do mTest <- eval expr
-                     when (mToBool mTest) $ set sas
+   go (Write cond ws) = do
+     condition <- evalCond cond
+     when condition $ write ws
+
+   go (Set cond sas) = do
+     condition <- evalCond cond
+     when condition $ set sas
 
    go (Xecute cond arg) = do
-     condition <- case cond of
-                    Nothing -> return True
-                    Just ex -> mToBool `liftM` eval ex
+     condition <- evalCond cond
      when condition $ do
        str <- asString `liftM` eval arg
        case parse parseCommands "XECUTE" str of
@@ -398,9 +391,7 @@ exec (cmd:cmds)
           modify tail
 
    go (Kill cond args) = do
-     condition <- case cond of
-                    Nothing -> return True
-                    Just ex -> mToBool `liftM` eval ex
+     condition <- evalCond cond
      when condition $ case args of
          [] -> fail "Sorry, I don't know how to kill everything"
          _ -> do
@@ -418,9 +409,7 @@ exec (cmd:cmds)
                  _ -> fail "I can only do selective kills, sorry!"
 
    go (New cond args) = do
-     condition <- case cond of
-                    Nothing -> return True
-                    Just ex -> mToBool `liftM` eval ex
+     condition <- evalCond cond
      when condition $ case args of
          [] -> newExclusive []
          _ -> do
