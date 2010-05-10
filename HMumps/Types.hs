@@ -216,6 +216,7 @@ data BifCall
     | BifY
     | BifTest
     | BifOrder Vn (Maybe Expression)
+    | BifReplace Expression Expression Expression
  deriving Show
 
 

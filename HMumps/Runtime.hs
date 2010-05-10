@@ -755,6 +755,12 @@ evalBif (BifOrder vn' expForward) = do
                         Just v -> return v
     Gvn{} -> fail "$ORDER on globals is not supported"
     _ -> error "Fatal error in ORDER"
+evalBif (BifReplace haystack' needle' replacement') = do
+  haystack <- eval haystack'
+  needle <- eval needle'
+  replacement <- eval replacement'
+  return $ M.join replacement $ M.split needle haystack
+
 
 evalBif bif = fail $ "oops! I don't know what to do with " ++ show bif
 

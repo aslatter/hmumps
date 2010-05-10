@@ -348,7 +348,14 @@ parseExpFuncall = char_ '$' >>
                   (parseBif <|> parseExFun)
 
 parseBif :: Parser Expression
-parseBif = ExpBifCall `liftM` (parseBifC <|> parseBifX <|> parseBifY <|> parseBifT <|> parseBifO)
+parseBif = liftM ExpBifCall $ msum
+           [ parseBifC
+           , parseBifX
+           , parseBifY
+           , parseBifT
+           , parseBifO
+           , parseReplace
+           ]
 
 parseBifC :: Parser BifCall
 parseBifC = do
@@ -370,6 +377,14 @@ parseBifO = do
   stringOrPrefix1 "order"
   (vn, dir) <- parse2args parseVn parseExp
   return $ BifOrder vn dir
+
+parseReplace :: Parser BifCall
+parseReplace = do
+  stringOrPrefix1 "zreplace"
+  args <- arglist1 parseExp
+  case args of
+    [haystack,needle,replacement] -> return $ BifReplace haystack needle replacement
+    _ -> fail "$$ZREPLACE requires three arguments"
 
 -- | parse two function arguments where the second is optional
 parse2args :: Parser a -> Parser b -> Parser (a, Maybe b)
