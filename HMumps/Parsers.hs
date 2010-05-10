@@ -33,6 +33,7 @@ import HMumps.Routine
 import HMumps.SyntaxTree
 
 import Data.Char
+import Data.String
 import Control.Monad
 import Text.Parsec hiding (spaces)
 import Text.Parsec.String
@@ -409,15 +410,15 @@ parseExpLit = parseNumLit <|> parseStringLit
 -- Does not work  with scientific notation yet
 parseNumLit :: Parser Expression
 parseNumLit = do xs <- many1 digit
-                 (do char_ '.'; ys <- many1 digit; (return . ExpLit . Float . read)  (xs ++ ['.'] ++ ys))
-                  <|> (return . ExpLit. Number .read) xs
+                 (do char_ '.'; ys <- many1 digit; (return . ExpLit . fromDouble . read)  (xs ++ ['.'] ++ ys))
+                  <|> (return . ExpLit. fromInteger . read) xs
 
 -- parse a string literal - uses one char of look-ahead
 parseStringLit :: Parser Expression
 parseStringLit = do char_ '"'
                     xs <- many $ (try $ do string_ "\"\"";return '\"') <|> (noneOf "\"")
                     char_ '"'
-                    (return . ExpLit . String) xs
+                    (return . ExpLit . fromString) xs
 
 
 -- No guarantees that the list of binops is complete.

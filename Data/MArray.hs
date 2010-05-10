@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror #-}
+{-# OPTIONS -Wall #-}
 
 module Data.MArray (
                MArray,
@@ -14,7 +14,7 @@ module Data.MArray (
 -- aslatter@gmail.com
 
 import Data.Map
-import Data.MValue
+import Data.MValue hiding (split)
 import Prelude hiding (lookup,null)
 import Test.QuickCheck
 
@@ -91,9 +91,11 @@ order (MArray _ map') forward mv =
     in if null map'' then Nothing
        else let (k, _) = findElem map'' in Just k 
 
+{-
 instance Arbitrary MArray where
     arbitrary = do
       n <- arbitrary
       xs <- arbitrary
       return $ MArray n (fromList xs)
     coarbitrary (MArray n xs) = variant 0 . coarbitrary (n,toList xs)
+-}

@@ -2,17 +2,43 @@
 {-# LANGUAGE Rank2Types, DeriveDataTypeable #-}
 
 -- |This module defines the basic MUMPS type: the MValue
-module Data.MValue where
+module Data.MValue
+    ( MValue
+    , fromText
+    , fromDouble
+    , asString
+    , asText
+    , asInt
+    , follows
+    , contains
+    , isNum
+    , mToBool
+    , boolToM
+    , mConcat
+    , mNot
+    , mAnd
+    , mOr
+    , mGT
+    , mLT
+    , mQuot
+    , mRem
+    , mPow
+    , split
+    , join
+    ) where
 
 -- Copyright 2007 Antoine Latter
 -- aslatter@gmail.com
 
-import Char
+import Data.Char
 import Data.Ratio
 import qualified Data.List as L
 import Test.QuickCheck
 import Data.Generics
 import Data.String
+import qualified Data.Text as T
+import Data.Text (Text)
+import Data.Monoid (mappend)
 
 -- The MUMPS value type - is transparently a string or int
 -- or float.
@@ -22,7 +48,7 @@ import Data.String
 -- However the integer and double representation are purely
 -- for convinience, as far as the standard is concerned the number
 -- type is a strict subtype of the string type.
-data MValue = String String
+data MValue = String Text
             | Number Integer
             | Float  Double
  deriving (Show,Data,Typeable)
@@ -65,7 +91,33 @@ instance Ord MValue where
     compare mv (String s2) = let (String s1) = mString mv in compare s1 s2
 
 instance IsString MValue where
-    fromString str = String str
+    fromString = String . fromString
+
+fromText :: Text -> MValue
+fromText = String
+
+asText :: MValue -> Text
+asText v
+    = let String str = mString v
+      in str
+
+asString :: MValue -> String
+asString
+    = T.unpack . asText
+
+asInt :: MValue -> Int
+asInt v = let (Number i) = mNum v in fromInteger i
+
+fromDouble :: Double -> MValue
+fromDouble = Float
+
+split :: MValue -> MValue -> [MValue]
+split needle haystack
+    = map fromText $ T.split (asText needle) (asText haystack)
+
+join :: MValue -> [MValue] -> MValue
+join delim pieces
+    = fromText $ T.intercalate (asText delim) (map asText pieces)
 
 follows :: MValue -> MValue -> MValue
 follows a b = boolToM $ follows' a b
@@ -82,21 +134,21 @@ follows a b = boolToM $ follows' a b
 contains :: MValue -> MValue -> MValue
 contains a b = boolToM $ contains' a b
  where contains' :: MValue -> MValue -> Bool
-       contains' (String s1) (String s2) = s2 `L.isInfixOf` s1
+       contains' (String s1) (String s2) = s2 `T.isInfixOf` s1
        contains' (String s1) mv          = let String s2 = mString mv
-                                           in s2 `L.isInfixOf` s1
+                                           in s2 `T.isInfixOf` s1
        contains' mv (String s2)          = let String s1 = mString mv
-                                           in s2 `L.isInfixOf` s1
+                                           in s2 `T.isInfixOf` s1
        contains' mv1 mv2                 = contains' (mString mv1) (mString mv2)
 
 -- |Cast to String - the returned MValue is always built with the String
 -- constructor.
 mString :: MValue -> MValue
-mString (Number n)   = String $ show n
-mString (Float f)    = String $ if f == fromIntegral (truncate f :: Integer)
+mString (Number n)   = fromString $ show n
+mString (Float f)    = fromString $ if f == fromIntegral (truncate f :: Integer)
                                 then show (truncate f :: Integer)
                                 else show f
-mString x@(String _) = x
+mString x@(String s) = x
 
 
 -- |Cast to number.  Leading + or - signs are interpretted as unary
@@ -106,19 +158,21 @@ mString x@(String _) = x
 -- leading charecters cannot be interpretted in a numeric context, zero is
 -- returned.
 mNum :: MValue -> MValue
-mNum (String [])  = Number 0
-mNum (String ('+':s)) = mNum $ String s
-mNum (String ('-':s)) = case mNum (String s) of
+mNum v@String{}
+    = case asString v of
+        [] -> Number 0
+        ('+':s) -> mNum $ fromString s
+        ('-':s) -> case mNum (fromString s) of
                           Number 0 -> Number 0
                           Number n -> Number (- n)
                           Float  n -> Float  (- n)
                           String _ -> error "mNum should not produce an MValue contructed with \"String\""
-mNum (String s) = if isSpace (head s) then Number 0 else
-  case (reads s :: [(Integer,String)]) of
-    (i,_):[] -> Number i
-    _        -> case (reads s :: [(Double,String)]) of
-                  (f,_):[] -> Float f
-                  _        -> Number 0
+        s -> if isSpace (head s) then Number 0 else
+                 case (reads s :: [(Integer,String)]) of
+                   (i,_):[] -> Number i
+                   _        -> case (reads s :: [(Double,String)]) of
+                                 (f,_):[] -> Float f
+                                 _        -> Number 0
 mNum x = x
 
 -- |Tests to see if an MValue is a number.
@@ -132,7 +186,7 @@ mNot :: MValue -> MValue
 mNot = boolToM . not . mToBool
 
 mConcat :: MValue -> MValue -> MValue
-mConcat (String left) (String right) = String $ left ++ right
+mConcat (String left) (String right) = String $ left `mappend` right
 mConcat l@(String _) r = l `mConcat` (mString r)
 mConcat l r@(String _) = (mString l) `mConcat` r
 mConcat l r = (mString l) `mConcat` (mString r)
@@ -287,7 +341,7 @@ mPow (Float l) (Float r)   = Float $ l ** r
 mPow (Number l) (Float r)  = Float $ (fromInteger l) ** r
 mPow (Float l) (Number r)  = Float $ l ^^ r
 
-
+{-
 instance Arbitrary Char where
     arbitrary = elements ('%':['A'..'z'])
     coarbitrary c = variant (fromEnum c `rem` 4)
@@ -295,7 +349,7 @@ instance Arbitrary Char where
 instance Arbitrary MValue where
     arbitrary = oneof [do
                          x <- arbitrary
-                         return $ String x,
+                         return $ fromString x,
                        do
                          x <- arbitrary
                          return $ Number x,
@@ -322,3 +376,4 @@ testTrailingZero :: Integer -> Bool
 testTrailingZero n = (mString . Number) n == (mString . Float . fromIntegral) n
       where _types = n :: Integer
 
+-}

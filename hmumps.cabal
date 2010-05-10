@@ -29,7 +29,7 @@ Executable hmumps
   
   Build-depends:       base == 4.*, haskell98, regex-compat, parsec == 3.1.*,
                        QuickCheck == 1.*, mtl == 1.1.*, containers == 0.3.*,
-                       haskeline == 0.6.*, syb == 0.1.*
+                       haskeline == 0.6.*, syb == 0.1.*, text == 0.7.*
   
   Other-modules:       Data.MArray
                        Data.MValue

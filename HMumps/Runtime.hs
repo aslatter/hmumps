@@ -19,9 +19,12 @@ where
 import Prelude hiding (lookup,break,map)
 
 import Data.Char (chr)
+import Data.String
+import qualified Data.List as L
 import Data.Map
 import Data.Maybe
-import Data.MValue
+import Data.MValue hiding (join)
+import qualified Data.MValue as M
 import Data.MArray
 import Data.Monoid
 
@@ -146,11 +149,6 @@ instance Normalizable GotoArg where
 
 normalizeError :: (Show a, MonadIO m) => a -> m b
 normalizeError err = (liftIO . putStrLn . show $ err) >> fail ""
-
-asString :: MValue -> String
-asString v
-    = let String str = mString v
-      in str
 
 -- | Remove any KillArgList constructors
 flattenKillArgs :: [KillArg] -> [KillArg]
@@ -410,7 +408,7 @@ exec ((Goto cond args):cmds)
        Label name -> return name
        LabelInt{} -> fail "Unable to handle numeric labels"
        _ -> error "Fatal error handling entry reference"
-
+     
 
 -- regular commands go through the command driver
 
@@ -594,7 +592,7 @@ getLocal :: String -> [MValue] -> RunMonad MValue
 getLocal label subs = do ma <- fetch label
                          return $ case mIndex ma subs of
                            Just mv -> mv
-                           Nothing -> String ""                         
+                           Nothing -> fromString ""                         
 
 getLocalArray :: String -> [MValue] -> RunMonad (Maybe MArray)
 getLocalArray label subs = do
@@ -634,7 +632,7 @@ eval (ExpVn vn) = do vn' <- normalize vn
 eval (ExpUnop unop expr) = do mv <- eval expr
                               return $ case unop of
                                 UNot   -> mNot   mv
-                                UPlus  -> mNum   mv
+                                UPlus  -> mv+0
                                 UMinus -> negate mv
 eval (ExpBinop binop lexp rexp) 
  = do lv <- eval lexp
@@ -731,10 +729,8 @@ evalBif :: BifCall -> RunMonad MValue
 evalBif (BifChar args') = do
   args <- mapM eval args'
   let str = fmap (chr . asInt) args
-  return $ String str
+  return $ fromString str
 
- where asInt :: MValue -> Int
-       asInt v = let (Number i) = mNum v in fromInteger i
 evalBif BifX = getX
 evalBif BifY = getY
 evalBif BifTest = boolToM `liftM` getTest
@@ -803,3 +799,4 @@ zipRem [] xs         = ([],Just $ Right xs)
 zipRem xs []         = ([],Just $ Left  xs)
 zipRem (x:xs) (y:ys) = let (pairs, remainder) = zipRem xs ys
                        in ((x,y):pairs,remainder)
+
