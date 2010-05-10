@@ -1,5 +1,5 @@
-{-# OPTIONS -Wall -fglasgow-exts #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS -Wall #-}
+{-# LANGUAGE TemplateHaskell, FlexibleContexts, RelaxedPolyRec #-}
 
 module Main where
 

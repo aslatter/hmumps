@@ -1,5 +1,7 @@
-{-# OPTIONS_GHC -Wall -fglasgow-exts #-}
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, ViewPatterns #-}
+{-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, ViewPatterns, ScopedTypeVariables,
+             Rank2Types, GeneralizedNewtypeDeriving
+  #-}
 
 module HMumps.Runtime(RunState(..),
                       Env(..),

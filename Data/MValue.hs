@@ -1,6 +1,5 @@
-{-# OPTIONS -Wall
-            -fglasgow-exts
-  #-}
+{-# OPTIONS -Wall #-}
+{-# LANGUAGE Rank2Types, DeriveDataTypeable #-}
 
 -- |This module defines the basic MUMPS type: the MValue
 module Data.MValue where
