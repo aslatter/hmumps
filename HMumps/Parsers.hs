@@ -181,7 +181,7 @@ parseFor = do stringOrPrefix1 "for"
 
 parseHa :: Parser Command
 parseHa = do stringOrPrefix1 "ha"
-             (parseHang <|> parseHalt)
+             (try parseHang <|> parseHalt)
              
 --Not sufficiently left factored
 parseHang :: Parser Command
