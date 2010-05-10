@@ -387,7 +387,9 @@ exec (cmd:cmds)
           let newFrame = RunState (Just $ (Env NormalEnv) mempty) (const Nothing)
           modify (newFrame:)
           res <- exec $ xcmds ++ [Quit Nothing Nothing]
-          when (isJust res) $ fail "XECUTE returned with a value"
+          case res of
+            Just (Just{}) -> fail "XECUTE cannot return with a value"
+            _ -> return ()
           modify tail
 
    go (Kill cond args) = do
