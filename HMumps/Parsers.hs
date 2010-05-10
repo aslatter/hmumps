@@ -47,7 +47,7 @@ parseFile = many $
                linelevel <- length `liftM` many (do spaces; x <- char '.'; spaces; return x)
                cmds <- parseCommands
                optional comment
-               char '\n'
+               char_ '\n'
                return (tag, linelevel, cmds)
 
 parseTag :: Parser Tag
@@ -83,10 +83,10 @@ parseCommands = (many $ do c <- command
 
 
 -- munch comments
-comment :: Parser String
-comment = do char ';'
-             cmt <- many $ noneOf "\n"
-             return cmt
+comment :: Parser ()
+comment = do char_ ';'
+             _ <- many $ noneOf "\n"
+             return ()
 
 -- |Parses a single command.
 command :: Parser Command
@@ -112,7 +112,7 @@ parseBreak = do stringOrPrefix1 "break"
                 return $ Break cond
 
 postCondition :: Parser (Maybe Expression)
-postCondition = do char ':'
+postCondition = do char_ ':'
                    cond <- parseExpAtom
                    return $ Just cond
       <|> return Nothing
@@ -121,14 +121,14 @@ postCondition = do char ':'
 parseDo :: Parser Command
 parseDo = do stringOrPrefix1 "do"
              cond <- postCondition
-             do char ' '
+             do char_ ' '
                 args <- mlist parseDoArg
                 return $ Do cond args
               <|> do eol
                      return $ Do cond []
 
 parseDoArg :: Parser DoArg
-parseDoArg = (do char '@'; expr <- parseExpAtom; return $ DoArgIndirect expr)
+parseDoArg = (do char_ '@'; expr <- parseExpAtom; return $ DoArgIndirect expr)
          <|> (do loc <- parseEntryRef
                  args <- arglist parseFunArg
                  cond <- postCondition
@@ -139,14 +139,14 @@ parseDoArg = (do char '@'; expr <- parseExpAtom; return $ DoArgIndirect expr)
 parseGoto :: Parser Command
 parseGoto = do stringOrPrefix1 "goto"
                cond <- postCondition
-               do char ' '
+               do char_ ' '
                   args <- mlist parseGotoArg
                   return $ Goto cond args
                 <|> do eol
                        return $ Goto cond []
 
 parseGotoArg :: Parser GotoArg
-parseGotoArg = (try (do char '@'; expr <- parseExpAtom; return $ GotoArgIndirect expr))
+parseGotoArg = (try (do char_ '@'; expr <- parseExpAtom; return $ GotoArgIndirect expr))
            <|> (do loc <- parseEntryRef
                    cond <- postCondition
                    return $ GotoArg cond loc)
@@ -154,20 +154,20 @@ parseGotoArg = (try (do char '@'; expr <- parseExpAtom; return $ GotoArgIndirect
 parseElse :: Parser Command
 parseElse = do
   stringOrPrefix1 "else"
-  eol <|> do char ' '
-             eol <|> (char ' ' >> return ())
+  eol <|> do char_ ' '
+             eol <|> char_ ' '
   return Else
 
 parseFor :: Parser Command
 parseFor = do stringOrPrefix1 "for"
               (eol >> return ForInf)
                <|>
-                (do char ' '
+                (do char_ ' '
                     (do vn <- parseLvn
-                        char '='
+                        char_ '='
                         arg <- forArg
                         return $ For vn arg)
-                      <|> (do eol <|> (char ' ' >> return ())
+                      <|> (do eol <|> char_ ' '
                               return ForInf))
 
  where forArg :: Parser ForArg
@@ -188,7 +188,7 @@ parseHang :: Parser Command
 parseHang = do
   stringOrPrefix "ng"
   cond <- postCondition
-  char ' '
+  char_ ' '
   expr <- parseExp
   return $ Hang cond expr
 
@@ -200,14 +200,14 @@ parseHalt = do
 
 parseIf :: Parser Command
 parseIf = do stringOrPrefix1 "if"
-             (char ' ' >> If `liftM` mlist parseExp)
+             (char_ ' ' >> If `liftM` mlist parseExp)
               <|> (eol >> (return $ If []))
 
 parseKill :: Parser Command
 parseKill = do 
   stringOrPrefix1 "kill"
   cond <- postCondition
-  (do char ' '
+  (do char_ ' '
       args <- mlist parseKillArg
       return $ Kill cond args)
    <|> (eol >> (return $ Kill cond []))
@@ -215,35 +215,35 @@ parseKill = do
 parseMerge :: Parser Command               
 parseMerge = do stringOrPrefix1 "merge"
                 cond <- postCondition
-                char ' '
+                char_ ' '
                 args <- mlist1 parseMergeArg
                 return $ Merge cond args
 
 parseMergeArg :: Parser MergeArg
-parseMergeArg = (do char '@'
+parseMergeArg = (do char_ '@'
                     expr <- parseExpAtom
                     return $ MergeArgIndirect expr)
-            <|> (liftM2 MergeArg parseVn (char '=' >> parseVn))
+            <|> (liftM2 MergeArg parseVn (char_ '=' >> parseVn))
             <?> "MERGE argument or indirection"
 
 parseNew :: Parser Command
 parseNew = do stringOrPrefix1 "new"
               cond <- postCondition
-              (char ' ' >>  New cond `liftM` (mlist parseNewArg))
+              (char_ ' ' >>  New cond `liftM` (mlist parseNewArg))
                <|> (eol >> (return $ New cond []))
 
 parseNewArg :: Parser NewArg
-parseNewArg = (do char '('
+parseNewArg = (do char_ '('
                   args <- mlist litName
-                  char ')'
+                  char_ ')'
                   return $ NewExclusive args)
-          <|> (NewIndirect `liftM` (char '@' >> parseExpAtom))
+          <|> (NewIndirect `liftM` (char_ '@' >> parseExpAtom))
           <|> NewSelective `liftM` litName
 
 parseQuit :: Parser Command
 parseQuit = do stringOrPrefix1 "quit"
                return Quit `ap` postCondition `ap` quitArg
- where quitArg = (char ' ' >> (Just `liftM` parseExp <|> (eol >> return Nothing) <|> (char ' ' >> return Nothing)))
+ where quitArg = (char_ ' ' >> (Just `liftM` parseExp <|> (eol >> return Nothing) <|> (char_ ' ' >> return Nothing)))
              <|> (eol >> return Nothing)
 
 eol :: Parser ()
@@ -252,7 +252,7 @@ eol = notFollowedBy $ noneOf "\n;"
 parseRead :: Parser Command
 parseRead = do stringOrPrefix1 "read"
                cond <- postCondition
-               char ' '
+               char_ ' '
                args <- mlist1 parseWriteArg
                case last args of
                  WriteExpression (ExpVn vn) -> return $ Read cond (init args) vn
@@ -261,29 +261,29 @@ parseRead = do stringOrPrefix1 "read"
 
 parseSet :: Parser Command
 parseSet = do stringOrPrefix1 "set"
-              return Set `ap` postCondition `ap` (char ' ' >> mlist1 setArg)
+              return Set `ap` postCondition `ap` (char_ ' ' >> mlist1 setArg)
  where setArg = do lhs <- arglist1 parseVn <|> liftM (\x->[x]) parseVn
-                   char '='
+                   char_ '='
                    rhs <- parseExp
                    return (lhs,rhs)
 
 parseWrite :: Parser Command
 parseWrite = do stringOrPrefix1 "write"
-                return Write `ap` postCondition `ap` (char ' ' >> mlist1 parseWriteArg)
+                return Write `ap` postCondition `ap` (char_ ' ' >> mlist1 parseWriteArg)
 
 parseWriteArg :: Parser WriteArg
 parseWriteArg = (WriteFormat `liftM` many1 parseWriteFormatCode)
-            <|> do char '@'
+            <|> do char_ '@'
                    expr <- parseExpAtom
-                   (char '@' >> do args <- arglist parseExp
-                                   return $ WriteExpression $ ExpVn $ IndirectVn expr args)
+                   (char_ '@' >> do args <- arglist parseExp
+                                    return $ WriteExpression $ ExpVn $ IndirectVn expr args)
                     <|> (return $ WriteIndirect expr)
             <|> (WriteExpression `liftM` parseExp)
 
 parseWriteFormatCode :: Parser WriteFormatCode
-parseWriteFormatCode = (char '#' >> return Formfeed)
-                   <|> (char '!' >> return Newline)
-                   <|> (char '?' >> return Tab `ap` parseInt)
+parseWriteFormatCode = (char_ '#' >> return Formfeed)
+                   <|> (char_ '!' >> return Newline)
+                   <|> (char_ '?' >> return Tab `ap` parseInt)
  where parseInt :: Parser Int
        parseInt = return read `ap` many1 (oneOf ['0'..'9'])
 
@@ -291,23 +291,22 @@ parseXecute :: Parser Command
 parseXecute = do
   stringOrPrefix1 "x"
   cond <- postCondition
-  char ' '
+  char_ ' '
   arg <- parseExp
   return $ Xecute cond arg
 
 parseKillArg :: Parser KillArg
-parseKillArg = (KillIndirect `liftM` (char '@' >> parseExpAtom))
+parseKillArg = (KillIndirect `liftM` (char_ '@' >> parseExpAtom))
            <|> (KillExclusive `liftM` arglist1 litName)
            <|> (KillSelective `liftM` parseVn)
 
-stringOrPrefix :: String -> Parser String
-stringOrPrefix str = stringOrPrefix1 str <|> return []
+stringOrPrefix :: String -> Parser ()
+stringOrPrefix str = stringOrPrefix1 str <|> return ()
 
-stringOrPrefix1 :: String -> Parser String
-stringOrPrefix1 [] = return []
-stringOrPrefix1 (x:xs) = do y <- char (toUpper x) <|> char (toLower x) <|> char x
-                            ys <- stringOrPrefix xs
-                            return (y:ys)
+stringOrPrefix1 :: String -> Parser ()
+stringOrPrefix1 [] = return ()
+stringOrPrefix1 (x:xs) = do char_ (toUpper x) <|> char_ (toLower x) <|> char_ x
+                            stringOrPrefix xs
 
 parseExpAtom :: Parser Expression
 parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp <|> parseExpLit)
@@ -315,14 +314,14 @@ parseExpAtom = (parseExpUnop <|> parseExpVn <|> parseExpFuncall <|> parseSubExp 
 -- |Parse an expression.  Is not at all forgiving about extraneous whitespace.
 parseExp :: Parser Expression
 parseExp = do let parseWrapper :: Parser ((Expression -> Expression) -> Expression -> Expression)
-                  parseWrapper = (do char '\''; return $ \f x -> ExpUnop UNot (f x)) <|> (return id)
+                  parseWrapper = (do char_ '\''; return $ \f x -> ExpUnop UNot (f x)) <|> (return id)
 
                   parseTailItem :: Parser (Expression -> Expression)
                   parseTailItem = do wrapper <- parseWrapper;
                                      ((do binop <- parseBinop;
                                           expr <- parseExpAtom;
                                           return $ wrapper  $ \x -> ExpBinop binop x expr)
-                                      <|>(do char '?';
+                                      <|>(do char_ '?';
                                              pat <- undefined;
                                              return $ pat))
               exp1 <- parseExpAtom
@@ -334,16 +333,16 @@ parseExpUnop :: Parser Expression
 parseExpUnop = (do unop <- parseUnop; expr <- parseExpAtom; return $ ExpUnop unop expr)
 
 parseUnop :: Parser UnaryOp
-parseUnop = (do char '\''; return UNot)
-        <|> (do char '+';  return UPlus)
-        <|> (do char '-';  return UMinus)
+parseUnop = (do char_ '\''; return UNot)
+        <|> (do char_ '+';  return UPlus)
+        <|> (do char_ '-';  return UMinus)
 
 parseExpVn :: Parser Expression
 parseExpVn = do vn <- parseVn
                 return $ ExpVn vn
 
 parseExpFuncall :: Parser Expression
-parseExpFuncall = char '$' >>
+parseExpFuncall = char_ '$' >>
                   (parseBif <|> parseExFun)
 
 parseBif :: Parser Expression
@@ -356,10 +355,10 @@ parseBifC = do
   return $ BifChar args
 
 parseBifX :: Parser BifCall
-parseBifX = char 'x' >> return BifX
+parseBifX = char_ 'x' >> return BifX
 
 parseBifY :: Parser BifCall
-parseBifY = char 'y' >> return BifY
+parseBifY = char_ 'y' >> return BifY
 
 parseBifT :: Parser BifCall
 parseBifT = stringOrPrefix1 "test" >> return BifTest
@@ -373,21 +372,21 @@ parseBifO = do
 -- | parse two function arguments where the second is optional
 parse2args :: Parser a -> Parser b -> Parser (a, Maybe b)
 parse2args a1 a2 = do
-  char '('
+  char_ '('
   v1 <- a1
-  v2 <- ((char ',' >> liftM Just a2) <|> return Nothing)
-  char ')'
+  v2 <- ((char_ ',' >> liftM Just a2) <|> return Nothing)
+  char_ ')'
   return (v1, v2)
 
 parseExFun :: Parser Expression
 parseExFun = do
-  char '$'
-  (do char '^'
+  char_ '$'
+  (do char_ '^'
       name2 <- parseValidName
       args  <- arglist parseFunArg
-      return $ FunCall [] name2 args)
+      return $ FunCall "" name2 args)
    <|> (do name1 <- parseValidName
-           (do char '^'
+           (do char_ '^'
                name2 <- parseValidName
                args <- arglist parseFunArg
                return $ FunCall name1 name2 args)
@@ -396,9 +395,9 @@ parseExFun = do
                       
 
 parseSubExp :: Parser Expression
-parseSubExp = do char '('
+parseSubExp = do char_ '('
                  expr <- parseExp
-                 char ')'
+                 char_ ')'
                  return expr
 
 -- Take a positive number or a string.  Any leading -/+ signs should've
@@ -409,40 +408,40 @@ parseExpLit = parseNumLit <|> parseStringLit
 -- Does not work  with scientific notation yet
 parseNumLit :: Parser Expression
 parseNumLit = do xs <- many1 digit
-                 (do char '.'; ys <- many1 digit; (return . ExpLit . Float . read)  (xs ++ ['.'] ++ ys))
+                 (do char_ '.'; ys <- many1 digit; (return . ExpLit . Float . read)  (xs ++ ['.'] ++ ys))
                   <|> (return . ExpLit. Number .read) xs
 
--- Does not work for quote-marks inside a string
+-- parse a string literal - uses one char of look-ahead
 parseStringLit :: Parser Expression
-parseStringLit = do char '"'
-                    xs <- many $ (try $ do string "\"\"";return '\"') <|> (noneOf "\"")
-                    char '"'
+parseStringLit = do char_ '"'
+                    xs <- many $ (try $ do string_ "\"\"";return '\"') <|> (noneOf "\"")
+                    char_ '"'
                     (return . ExpLit . String) xs
 
 
 -- No guarantees that the list of binops is complete.
 parseBinop :: Parser BinOp
-parseBinop = (char '_'  >> return Concat)
-         <|> (char '+'  >> return Add)
-         <|> (char '-'  >> return Sub)
-         <|> (char '*'  >> ((char '*' >> return Pow) <|> return Mult))
-         <|> (char '/'  >> return Div)
-         <|> (char '#'  >> return Rem)
-         <|> (char '\\' >> return Quot)
-         <|> (char '&'  >> return And)
-         <|> (char '!'  >> return Or)
-         <|> (char '='  >> return Equal)
-         <|> (char '<'  >> return LessThan)
-         <|> (char '>'  >> return GreaterThan)
-         <|> (char ']'  >> ((char ']' >> return SortsAfter) <|> return Follows))
-         <|> (char '['  >> return Contains)
+parseBinop = (char_ '_'  >> return Concat)
+         <|> (char_ '+'  >> return Add)
+         <|> (char_ '-'  >> return Sub)
+         <|> (char_ '*'  >> ((char_ '*' >> return Pow) <|> return Mult))
+         <|> (char_ '/'  >> return Div)
+         <|> (char_ '#'  >> return Rem)
+         <|> (char_ '\\' >> return Quot)
+         <|> (char_ '&'  >> return And)
+         <|> (char_ '!'  >> return Or)
+         <|> (char_ '='  >> return Equal)
+         <|> (char_ '<'  >> return LessThan)
+         <|> (char_ '>'  >> return GreaterThan)
+         <|> (char_ ']'  >> ((char_ ']' >> return SortsAfter) <|> return Follows))
+         <|> (char_ '['  >> return Contains)
          <?> "binary operator"
 
 
 -- Used in DoArg and GotoArg
 parseRoutineRef :: Parser Routineref
-parseRoutineRef = (do char '^'
-                      (do char '@'
+parseRoutineRef = (do char_ '^'
+                      (do char_ '@'
                           RoutinerefIndirect `liftM` parseExpAtom)
                         <|> Routineref `liftM` litName)
 
@@ -453,14 +452,14 @@ parseEntryRef = (Routine `liftM` parseRoutineRef)
                     routine <- parseRoutine
                     return $ Subroutine lbl offset routine)
  where
-   parseOffset = (char '+' >> (Just . read) `liftM` many1 (oneOf "1234567890"))
+   parseOffset = (char_ '+' >> (Just . read) `liftM` many1 (oneOf "1234567890"))
              <|> (return Nothing)
    parseRoutine = (Just `liftM` parseRoutineRef)
               <|> (return Nothing)
                       
 
 parseLabel :: Parser Label
-parseLabel = (char '@' >> LabelIndirect `liftM` parseExpAtom)
+parseLabel = (char_ '@' >> LabelIndirect `liftM` parseExpAtom)
          <|> (Label `liftM` litName)
 
                    
@@ -468,18 +467,18 @@ parseLabel = (char '@' >> LabelIndirect `liftM` parseExpAtom)
 --  1) An Expression
 --  2) A (local?) variable passed by ref
 parseFunArg :: Parser FunArg
-parseFunArg = (do char '.'
+parseFunArg = (do char_ '.'
                   FunArgName `liftM` litName)
           <|> (FunArgExp `liftM` parseExp)
 
 -- |Parses the name of a variable (with subscripts)
 parseVn :: Parser Vn
-parseVn = (do char '@'
+parseVn = (do char_ '@'
               expr <- parseExpAtom
-              args <- (do char '@'
+              args <- (do char_ '@'
                           arglist parseExp) <|> return []
               return $ IndirectVn expr args)
-      <|> (do char '^'
+      <|> (do char_ '^'
               name <- litName <|> return ""
               args <- arglist parseExp
               return $ Gvn name args)
@@ -509,29 +508,35 @@ mlist pa = mlist1 pa <|> return []
 mlist1 :: Parser a -> Parser [a]
 mlist1 pa = do 
               x <- pa
-              xs <- (do char ','
+              xs <- (do char_ ','
                         mlist pa) <|> return []
               return (x:xs)
 
 colonlist :: Parser a -> Parser [a]
 colonlist pa = do x <- pa
-                  xs <- many (char ':' >> pa)
+                  xs <- many (char_ ':' >> pa)
                   return (x:xs)
                             
 
 
 -- |Given a parser, parse a comma separated list of these surrounded by parens
 arglist :: Parser a -> Parser [a]
-arglist pa = do char '('
+arglist pa = do char_ '('
                 xs <- mlist pa
-                char ')'
+                char_ ')'
                 return xs
          <|> return []
 
 -- |Given a parser, parse a comma separated non-empty list of these
 -- surounded by parens
 arglist1 :: Parser a -> Parser [a]
-arglist1 pa = do char '('
+arglist1 pa = do char_ '('
                  xs <- mlist1 pa
-                 char ')'
+                 char_ ')'
                  return xs
+
+char_ :: Char -> Parser ()
+char_ c = char c >>= \_ -> return ()
+
+string_ :: String -> Parser ()
+string_ str = string str >>= \_ -> return ()

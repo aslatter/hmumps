@@ -4,10 +4,8 @@
 module Main where
 
 -- import Text.Parsec
-import System.IO
 import System.Console.Haskeline.Class
 import Control.Monad.State
-import Control.Monad.Error
 
 import HMumps.Runtime
 import HMumps.Parsers
@@ -18,7 +16,7 @@ main :: IO ()
 main = do
   -- hSetBuffering stdout NoBuffering
   putStrLn splash
-  runHaskelineT defaultSettings $ runStateT loop emptyState
+  runHaskelineT defaultSettings $ evalStateT loop emptyState
   return ()
 
 loop :: (MonadState [RunState] m, MonadHaskeline m) => m ()

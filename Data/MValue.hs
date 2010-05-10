@@ -13,7 +13,6 @@ import Data.Ratio
 import qualified Data.List as L
 import Test.QuickCheck
 import Data.Generics
-import Data.Typeable
 import Data.String
 
 -- The MUMPS value type - is transparently a string or int
@@ -209,7 +208,6 @@ instance Real MValue where
 instance Fractional MValue where
     fromRational a | denominator a == 1 = Number $ numerator a
                    | otherwise          = Float  $ fromRational a
-    fromRational _ = undefined
 
     recip m@(Number 1) = m
     recip (Number n)   = Float $ 1/(fromIntegral n)
@@ -218,7 +216,7 @@ instance Fractional MValue where
 
 mRealFracOp :: (forall a . RealFrac a => a -> b) -> MValue -> b
 mRealFracOp op m@(String _) = (op . mNum) m
-mRealFracOp op (Number n)   = op . fromIntegral $ n
+mRealFracOp op (Number n)   = op $ (fromIntegral n :: Double)
 mRealFracOp op (Float f)    = op f
 
 instance RealFrac MValue where

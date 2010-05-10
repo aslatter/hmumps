@@ -16,10 +16,10 @@ module HMumps.Runtime(RunState(..),
 where
 
 import Prelude hiding (lookup,break,map)
-import qualified Prelude as P
 
 import Data.Char (chr)
 import Data.Map
+import Data.Maybe
 import Data.MValue
 import Data.MArray
 import Data.Monoid
@@ -31,7 +31,6 @@ import HMumps.Parsers
 import Control.Applicative hiding (empty)
 import Control.Monad.State
 import Control.Monad.Error
-import Control.Monad.Maybe
 
 import System(exitWith)
 import System.Exit(ExitCode(..))
@@ -44,9 +43,9 @@ newtype RunMonad a = RM {runRunMonad :: ErrorT String (StateT [RunState] IO) a}
 step :: (MonadState [RunState] m, MonadIO m) => RunMonad a -> m (Either String a)
 step k
     = do
-  (s :: [RunState]) <- get
-  (a, s) <- liftIO $ flip runStateT s $ runErrorT $ runRunMonad k
-  put s
+  s <- get
+  (a, s') <- liftIO $ flip runStateT s $ runErrorT $ runRunMonad k
+  put s'
   return a
 
 -- |Anything you may ever want to strip indirection off of should
@@ -137,6 +136,7 @@ instance Normalizable Label where
         Left err -> normalizeError err
     normalize x = return x
 
+normalizeError :: (Show a, MonadIO m) => a -> m b
 normalizeError err = (liftIO . putStrLn . show $ err) >> fail ""
 
 asString :: MValue -> String
@@ -173,7 +173,7 @@ data EnvEntry = LookBack (Maybe Name)
 
 
 killLocal :: Name -> RunMonad ()
-killLocal label = modify $ go label
+killLocal = modify . go
 
  where go _ [] = []
        go label (f:fs)
@@ -185,10 +185,11 @@ killLocal label = modify $ go label
                             Nothing
                                 | envTag == StopEnv -> f:fs
                                 | otherwise -> f : go label fs
-                            Just (Entry ary)
+                            Just (Entry _ary)
                                 -> (RunState (Just (Env envTag (label `delete` envMap))) rou) : fs
                             Just (LookBack Nothing) -> f : go label fs
                             Just (LookBack (Just newLabel)) -> f : go newLabel fs
+                   _ -> error "Fatal error in KILL"
 
        noEnvFrame (RunState Nothing _) = True
        noEnvFrame _ = False
@@ -202,9 +203,9 @@ new label
 
  where
    go (RunState Nothing r) = RunState (Just (Env NormalEnv (insert label (Entry mEmpty) empty))) r
-   go (RunState (Just env) r)
+   go (RunState (Just ev) r)
        = let newEnv
-                 = case env of
+                 = case ev of
                     Env NormalEnv eMap -> Env NormalEnv $ insert label (Entry mEmpty) eMap
                     Env StopEnv eMap -> Env StopEnv $ delete label eMap
          in RunState (Just newEnv) r
@@ -221,12 +222,12 @@ newExclusive labels
        = let newEnv = foldr addLabel (Env StopEnv mempty) labels
          in RunState (Just newEnv) r
     where
-      addLabel label@(inEnv oldEnv -> Just entry) e@(Env StopEnv eMap)
+      addLabel label@(inEnv oldEnv -> Just entry) (Env _StopEnv eMap)
           = Env StopEnv $ insert label entry eMap
-      addLabel label e@(Env StopEnv eMap)
+      addLabel label (Env _StopEnv eMap)
           = Env StopEnv $ insert label (LookBack Nothing) eMap
 
-      inEnv Nothing lbl = Nothing
+      inEnv Nothing _ = Nothing
       inEnv (Just (Env _ eMap)) lbl
           = lbl `lookup` eMap
 
@@ -378,7 +379,8 @@ exec (cmd:cmds) = case cmd of
          Right xcmds -> do
           let newFrame = RunState (Just $ (Env NormalEnv) mempty) (const Nothing)
           modify (newFrame:)
-          exec $ xcmds ++ [Quit Nothing Nothing]
+          res <- exec $ xcmds ++ [Quit Nothing Nothing]
+          when (isJust res) $ fail "XECUTE returned with a value"
           modify tail
      exec cmds
 
@@ -426,7 +428,7 @@ exec (cmd:cmds) = case cmd of
                        -> do
                      arg <- normalize arg'
                      case arg of
-                       DoArgList args -> mapM_ processDo args
+                       DoArgList argList -> mapM_ processDo argList
                        _ -> processDo arg
         exec cmds
 
@@ -459,6 +461,7 @@ processDo (DoArg cond entryRef args)
           LabelInt{} -> fail "Cannot use numeric labels"
           _ -> error "fatal error in DO"
       Subroutine _ Just{} _ -> fail "Unable to execute DO with a numeric offset"
+processDo _ = error "fatal error in DO"
 
 evalCond :: Maybe Expression -> RunMonad Bool
 evalCond Nothing = return True
@@ -649,7 +652,7 @@ evalBif (BifOrder vn' expForward) = do
             subs <- mapM eval subs'
             case unSnoc subs of
               Nothing -> fail "Cannot $ORDER with no subscripts"
-              Just (rest,last)
+              Just (rest,lastSub)
                   -> do
                 ma <- getLocalArray label rest
                 case ma of
@@ -658,10 +661,11 @@ evalBif (BifOrder vn' expForward) = do
                       forward <- case expForward of
                                    Nothing -> return True
                                    Just ex -> mToBool `liftM` eval ex
-                      case order a forward last of
+                      case order a forward lastSub of
                         Nothing -> return ""
                         Just v -> return v
     Gvn{} -> fail "$ORDER on globals is not supported"
+    _ -> error "Fatal error in ORDER"
 
 evalBif bif = fail $ "oops! I don't know what to do with " ++ show bif
 
