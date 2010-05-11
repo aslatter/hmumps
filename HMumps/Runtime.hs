@@ -20,9 +20,7 @@ import Prelude hiding (lookup,break,map)
 
 import Data.Char (chr)
 import Data.String
-import qualified Data.List as L
 import Data.Map
-import Data.Maybe
 import Data.MValue hiding (join)
 import qualified Data.MValue as M
 import Data.MArray
@@ -377,15 +375,15 @@ exec ((Goto cond args):cmds)
 
  where
    execGotoArgs [] = exec cmds
-   execGotoArgs (arg':args)
+   execGotoArgs (arg:rest)
        = do
-     GotoArg cond entryRef <- normalize arg'
-     condition <- evalCond cond
+     GotoArg argCond entryRef <- normalize arg
+     condition <- evalCond argCond
      if condition
       then do
          (rou,tag) <- unpackEntryRef entryRef
          liftM Just $ goto rou tag
-      else execGotoArgs args
+      else execGotoArgs rest
 
    unpackEntryRef :: EntryRef -> RunMonad (Maybe Name, Name)
    unpackEntryRef entryRef =
@@ -400,6 +398,7 @@ exec ((Goto cond args):cmds)
                        label <- labelName label'
                        Routineref name <- normalize rRef
                        return (Just name, label)
+         Subroutine _ Just{} _ -> fail "unable to process numberic offsets for DO or GOTO"
 
    labelName :: Label -> RunMonad Name
    labelName label' = do
@@ -444,18 +443,18 @@ exec (cmd:cmds)
 
    -- the "routine" argument is only for use with GOTO,
    -- so we ignore it for now
-   go (Block cond rou lines) = do
+   go (Block cond rou doLines) = do
      condition <- evalCond cond
      when condition $ do
        RunState _ r _ <- gets head
        modify (emptyFrame {tags = r,gotoTags=rou}:)
-       doBlockLines lines
+       doBlockLines doLines
        modify tail
     where
       doBlockLines [] = return ()
-      doBlockLines (cmds:rest)
+      doBlockLines (doCmds:rest)
           = do
-        res <- exec cmds
+        res <- exec doCmds
         case res of
           Nothing -> doBlockLines rest
           Just Nothing -> return ()
@@ -761,8 +760,7 @@ evalBif (BifReplace haystack' needle' replacement') = do
   replacement <- eval replacement'
   return $ M.join replacement $ M.split needle haystack
 
-
-evalBif bif = fail $ "oops! I don't know what to do with " ++ show bif
+-- evalBif bif = fail $ "oops! I don't know what to do with " ++ show bif
 
 
 -- | returns the front of a list plus the last element.

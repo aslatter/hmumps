@@ -32,7 +32,6 @@ module Data.MValue
 
 import Data.Char
 import Data.Ratio
-import qualified Data.List as L
 import Test.QuickCheck
 import Data.Generics
 import Data.String
