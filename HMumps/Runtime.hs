@@ -34,8 +34,7 @@ import Control.Applicative hiding (empty)
 import Control.Monad.State
 import Control.Monad.Error
 
-import System(exitWith)
-import System.Exit(ExitCode(..))
+import System.Exit(exitWith, ExitCode(..))
 
 newtype RunMonad a = RM {runRunMonad :: ErrorT String (StateT [RunState] IO) a}
     deriving (Functor, Monad, MonadIO, MonadState [RunState], MonadError String)
