@@ -10,7 +10,10 @@ Name:                hmumps
 Version:             0.1
 
 Synopsis:            Interpreter for the MUMPS langugae
--- Description:         
+Description:         Partial interpreter for the MUMPS language.
+                     As this isn't nearly complete, it is mostly useful
+                     for educational purposes and exploring how the interpreter
+                     is constructed.
 License:             GPL
 License-file:        LICENSE
 Author:              Antoine Latter
